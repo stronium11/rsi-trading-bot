@@ -13,20 +13,34 @@ DEMO_MODE = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
 
 def get_nasdaq100_tickers() -> List[str]:
     """
-    Fetch NASDAQ 100 component tickers from Wikipedia
+    Fetch NASDAQ 100 component tickers from Wikipedia or use hardcoded list
     Returns list of ticker symbols
     """
+    # Hardcoded NASDAQ 100 list (updated as of Nov 2024)
+    nasdaq100_tickers = [
+        'AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMAT', 'AMD', 'AMGN',
+        'AMZN', 'ANSS', 'ASML', 'AVGO', 'AZN', 'BIIB', 'BKNG', 'BKR', 'CDNS', 'CEG',
+        'CHTR', 'CMCSA', 'COST', 'CPRT', 'CRWD', 'CSCO', 'CSGP', 'CSX', 'CTAS', 'CTSH',
+        'DDOG', 'DXCM', 'EA', 'EXC', 'FANG', 'FAST', 'FTNT', 'GEHC', 'GFS', 'GILD',
+        'GOOGL', 'GOOG', 'HON', 'IDXX', 'ILMN', 'INTC', 'INTU', 'ISRG', 'KDP', 'KHC',
+        'KLAC', 'LIN', 'LRCX', 'LULU', 'MAR', 'MCHP', 'MDB', 'MDLZ', 'MELI', 'META',
+        'MNST', 'MRNA', 'MRVL', 'MSFT', 'MU', 'NFLX', 'NVDA', 'NXPI', 'ODFL', 'ON',
+        'ORLY', 'PANW', 'PAYX', 'PCAR', 'PDD', 'PEP', 'PYPL', 'QCOM', 'REGN', 'ROP',
+        'ROST', 'SBUX', 'SMCI', 'SNPS', 'TEAM', 'TMUS', 'TSLA', 'TTD', 'TTWO', 'TXN',
+        'VRSK', 'VRTX', 'WBD', 'WDAY', 'XEL', 'ZS'
+    ]
+
     try:
-        # Read NASDAQ 100 from Wikipedia
+        # Try to fetch from Wikipedia first
         tables = pd.read_html(config.NASDAQ_100_URL)
         df = tables[4]  # The ticker table is usually the 4th table
         tickers = df['Ticker'].tolist()
-        print(f"Fetched {len(tickers)} NASDAQ 100 tickers")
+        print(f"✓ Fetched {len(tickers)} NASDAQ 100 tickers from Wikipedia")
         return tickers
     except Exception as e:
-        print(f"Error fetching NASDAQ 100 tickers: {e}")
-        # Fallback to a small sample for testing
-        return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']
+        print(f"⚠ Could not fetch from Wikipedia: {e}")
+        print(f"✓ Using hardcoded NASDAQ 100 list ({len(nasdaq100_tickers)} tickers)")
+        return nasdaq100_tickers
 
 
 def fetch_stock_data(ticker: str, period: str = config.DATA_PERIOD) -> pd.DataFrame:
