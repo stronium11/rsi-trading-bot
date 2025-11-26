@@ -44,6 +44,12 @@ Examples:
         help='Display summary of logged signals and exit'
     )
 
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Show detailed debug information (why signals are filtered)'
+    )
+
     args = parser.parse_args()
 
     # Show summary and exit
@@ -59,14 +65,16 @@ Examples:
     if args.test:
         print("\n🔍 Running TEST scan with sample tickers...")
         test_tickers = ['AAPL', 'MSFT', 'GOOGL', 'NVDA', 'TSLA', 'META', 'AMZN']
-        scanner.quick_scan(test_tickers)
+        scanner.load_tickers(test_tickers)
+        scanner.scan_all(debug=args.debug)
     elif args.tickers:
         print(f"\n🔍 Scanning specific tickers: {', '.join(args.tickers)}")
-        scanner.quick_scan(args.tickers)
+        scanner.load_tickers(args.tickers)
+        scanner.scan_all(debug=args.debug)
     else:
         print("\n🔍 Running FULL scan of NASDAQ 100...")
         scanner.load_tickers()
-        scanner.scan_all()
+        scanner.scan_all(debug=args.debug)
 
     # Show summary after scan
     print("\n📊 Displaying signal summary...")

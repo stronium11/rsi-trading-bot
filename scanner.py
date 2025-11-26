@@ -35,12 +35,13 @@ class TradingSignalScanner:
             self.tickers = get_nasdaq100_tickers()
             print(f"Loaded NASDAQ 100 tickers: {len(self.tickers)} tickers")
 
-    def scan_ticker(self, ticker: str) -> List[Dict]:
+    def scan_ticker(self, ticker: str, debug: bool = False) -> List[Dict]:
         """
         Scan a single ticker for signals across all timeframes
 
         Args:
             ticker: Stock ticker symbol
+            debug: If True, print detailed debug information
 
         Returns:
             List of signals found
@@ -66,19 +67,39 @@ class TradingSignalScanner:
             # Validate trend (includes separation and stability checks)
             trend = validate_trend(df_timeframe, settings['stability_check_days'])
 
+            if debug and trend is None:
+                # Show why no trend was detected
+                if len(df_timeframe) > 0:
+                    latest = df_timeframe.iloc[-1]
+                    print(f"  [{timeframe}] No valid trend - SMA50: {latest.get('SMA_50', 'N/A'):.2f}, SMA100: {latest.get('SMA_100', 'N/A'):.2f}, SMA200: {latest.get('SMA_200', 'N/A'):.2f}")
+
             if trend is None:
                 continue  # No valid trend, skip this timeframe
 
             # Detect signals
             timeframe_signals = detect_signals(df_timeframe, ticker, timeframe, trend)
+
+            if debug:
+                if timeframe_signals:
+                    print(f"  [{timeframe}] {trend} trend - Found {len(timeframe_signals)} signal(s)")
+                else:
+                    latest = df_timeframe.iloc[-1]
+                    print(f"  [{timeframe}] {trend} trend - No signals (Price: ${latest['Close']:.2f})")
+
             signals.extend(timeframe_signals)
 
         return signals
 
-    def scan_all(self):
-        """Scan all tickers and log signals"""
+    def scan_all(self, debug: bool = False):
+        """Scan all tickers and log signals
+
+        Args:
+            debug: If True, print detailed debug information for each ticker
+        """
         print(f"\n{'='*60}")
         print(f"Starting scan of {len(self.tickers)} tickers...")
+        if debug:
+            print("DEBUG MODE: Showing detailed filtering info")
         print(f"{'='*60}\n")
 
         self.all_signals = []
@@ -87,8 +108,12 @@ class TradingSignalScanner:
 
         for ticker in self.tickers:
             try:
-                print(f"Scanning {ticker}... ", end='', flush=True)
-                signals = self.scan_ticker(ticker)
+                if debug:
+                    print(f"\nScanning {ticker}:")
+                else:
+                    print(f"Scanning {ticker}... ", end='', flush=True)
+
+                signals = self.scan_ticker(ticker, debug=debug)
 
                 if signals:
                     # Filter duplicates
@@ -96,11 +121,16 @@ class TradingSignalScanner:
 
                     if unique_signals:
                         self.all_signals.extend(unique_signals)
-                        print(f"✓ Found {len(unique_signals)} new signal(s)")
+                        if not debug:
+                            print(f"✓ Found {len(unique_signals)} new signal(s)")
                     else:
-                        print("✓ (signals filtered as duplicates)")
+                        if debug:
+                            print(f"  → Signals filtered as duplicates")
+                        else:
+                            print("✓ (signals filtered as duplicates)")
                 else:
-                    print("✓ (no signals)")
+                    if not debug:
+                        print("✓ (no signals)")
 
                 processed += 1
 
@@ -134,12 +164,13 @@ class TradingSignalScanner:
                   f"SMA: ${signal['sma_value']:8.2f} | "
                   f"Distance: {signal['distance_pct']:.3f}%")
 
-    def quick_scan(self, tickers: List[str]):
+    def quick_scan(self, tickers: List[str], debug: bool = False):
         """
         Quick scan of specific tickers (for testing)
 
         Args:
             tickers: List of ticker symbols
+            debug: If True, print detailed debug information
         """
         self.load_tickers(tickers)
-        self.scan_all()
+        self.scan_all(debug=debug)
