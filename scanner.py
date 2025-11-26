@@ -15,11 +15,12 @@ from logger import SignalLogger
 class TradingSignalScanner:
     """Main scanner class that coordinates all components"""
 
-    def __init__(self):
+    def __init__(self, target_date: str = None):
         self.deduplicator = SignalDeduplicator()
         self.logger = SignalLogger()
         self.tickers = []
         self.all_signals = []
+        self.target_date = target_date  # Format: 'YYYY-MM-DD'
 
     def load_tickers(self, custom_tickers: List[str] = None):
         """
@@ -52,6 +53,14 @@ class TradingSignalScanner:
         df = fetch_stock_data(ticker)
         if df.empty:
             return signals
+
+        # Filter data up to target date if specified
+        if self.target_date:
+            import pandas as pd
+            target_dt = pd.to_datetime(self.target_date)
+            df = df[df.index <= target_dt]
+            if df.empty:
+                return signals
 
         # Process each timeframe
         for timeframe, settings in config.TIMEFRAMES.items():
@@ -97,7 +106,10 @@ class TradingSignalScanner:
             debug: If True, print detailed debug information for each ticker
         """
         print(f"\n{'='*60}")
-        print(f"Starting scan of {len(self.tickers)} tickers...")
+        if self.target_date:
+            print(f"Starting scan of {len(self.tickers)} tickers for date: {self.target_date}")
+        else:
+            print(f"Starting scan of {len(self.tickers)} tickers...")
         if debug:
             print("DEBUG MODE: Showing detailed filtering info")
         print(f"{'='*60}\n")

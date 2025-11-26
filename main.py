@@ -50,6 +50,12 @@ Examples:
         help='Show detailed debug information (why signals are filtered)'
     )
 
+    parser.add_argument(
+        '--date',
+        type=str,
+        help='Scan for a specific date (YYYY-MM-DD format, e.g., 2025-11-25)'
+    )
+
     args = parser.parse_args()
 
     # Show summary and exit
@@ -59,7 +65,7 @@ Examples:
         return
 
     # Initialize scanner
-    scanner = TradingSignalScanner()
+    scanner = TradingSignalScanner(target_date=args.date)
 
     # Run appropriate scan
     if args.test:
