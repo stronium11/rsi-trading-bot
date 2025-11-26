@@ -94,11 +94,6 @@ def detect_signals(df: pd.DataFrame, ticker: str, timeframe: str, trend: str) ->
 
         # Check if price is near this SMA today
         if check_price_near_sma(current_price, sma_value):
-            # FILTER: Check if price touched this SMA yesterday (1 trading day ago)
-            if check_sma_touch_history(df, period, lookback_days=1):
-                # Skip this signal - price touched the same SMA yesterday
-                continue
-
             signal = {
                 'date': current_date.strftime('%Y-%m-%d') if hasattr(current_date, 'strftime') else str(current_date),
                 'ticker': ticker,
