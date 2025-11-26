@@ -58,6 +58,9 @@ class TradingSignalScanner:
         if self.target_date:
             import pandas as pd
             target_dt = pd.to_datetime(self.target_date)
+            # Handle timezone-aware datetime index
+            if df.index.tz is not None:
+                target_dt = target_dt.tz_localize(df.index.tz)
             df = df[df.index <= target_dt]
             if df.empty:
                 return signals
