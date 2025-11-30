@@ -65,8 +65,10 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
     df['bullish_divergence'] = False
     df['bearish_divergence'] = False
     df['divergence_first_peak_idx'] = np.nan
+    df['divergence_first_peak_date'] = pd.NaT
     df['divergence_first_peak_price'] = np.nan
     df['divergence_first_peak_rsi'] = np.nan
+    df['divergence_second_peak_date'] = pd.NaT
     df['divergence_second_peak_price'] = np.nan
     df['divergence_second_peak_rsi'] = np.nan
 
@@ -77,8 +79,10 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
                 if df['close'].iloc[i] > df['close'].iloc[j] and df['indicator'].iloc[i] < df['indicator'].iloc[j]:
                     df.at[df.index[i], 'bearish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
+                    df.at[df.index[i], 'divergence_first_peak_date'] = df.index[j]
                     df.at[df.index[i], 'divergence_first_peak_price'] = df['close'].iloc[j]
                     df.at[df.index[i], 'divergence_first_peak_rsi'] = df['indicator'].iloc[j]
+                    df.at[df.index[i], 'divergence_second_peak_date'] = df.index[i]
                     df.at[df.index[i], 'divergence_second_peak_price'] = df['close'].iloc[i]
                     df.at[df.index[i], 'divergence_second_peak_rsi'] = df['indicator'].iloc[i]
                     break  # only need one valid divergence
@@ -90,8 +94,10 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
                 if df['close'].iloc[i] < df['close'].iloc[j] and df['indicator'].iloc[i] > df['indicator'].iloc[j]:
                     df.at[df.index[i], 'bullish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
+                    df.at[df.index[i], 'divergence_first_peak_date'] = df.index[j]
                     df.at[df.index[i], 'divergence_first_peak_price'] = df['close'].iloc[j]
                     df.at[df.index[i], 'divergence_first_peak_rsi'] = df['indicator'].iloc[j]
+                    df.at[df.index[i], 'divergence_second_peak_date'] = df.index[i]
                     df.at[df.index[i], 'divergence_second_peak_price'] = df['close'].iloc[i]
                     df.at[df.index[i], 'divergence_second_peak_rsi'] = df['indicator'].iloc[i]
                     break
@@ -119,6 +125,18 @@ def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
     if len(df) == 0:
         return signals
 
+    # Helper function to format dates based on timeframe
+    def format_peak_date(date, timeframe):
+        """Format date based on timeframe: 4h includes hour, 1d+ only shows date"""
+        if pd.isna(date):
+            return None
+        if timeframe == '4h':
+            # Format as "MM-DD HH:00"
+            return date.strftime('%m-%d %H:00')
+        else:
+            # Format as "MM-DD" for 1d and 1w
+            return date.strftime('%m-%d')
+
     # Use the most recent date in the dataframe as reference
     most_recent_date = df.index[-1]
 
@@ -137,10 +155,12 @@ def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
                 'ticker': ticker,
                 'timeframe': timeframe,
                 'divergence_type': 'Bearish',
-                'first_peak_price': row['divergence_first_peak_price'],
-                'second_peak_price': row['divergence_second_peak_price'],
-                'first_peak_rsi': row['divergence_first_peak_rsi'],
-                'second_peak_rsi': row['divergence_second_peak_rsi']
+                'first_peak_date': format_peak_date(row['divergence_first_peak_date'], timeframe),
+                'first_peak_price': round(float(row['divergence_first_peak_price']), 2),
+                'first_peak_rsi': round(float(row['divergence_first_peak_rsi']), 2),
+                'second_peak_date': format_peak_date(row['divergence_second_peak_date'], timeframe),
+                'second_peak_price': round(float(row['divergence_second_peak_price']), 2),
+                'second_peak_rsi': round(float(row['divergence_second_peak_rsi']), 2)
             }
             signals.append(signal)
 
@@ -159,10 +179,12 @@ def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
                 'ticker': ticker,
                 'timeframe': timeframe,
                 'divergence_type': 'Bullish',
-                'first_peak_price': row['divergence_first_peak_price'],
-                'second_peak_price': row['divergence_second_peak_price'],
-                'first_peak_rsi': row['divergence_first_peak_rsi'],
-                'second_peak_rsi': row['divergence_second_peak_rsi']
+                'first_peak_date': format_peak_date(row['divergence_first_peak_date'], timeframe),
+                'first_peak_price': round(float(row['divergence_first_peak_price']), 2),
+                'first_peak_rsi': round(float(row['divergence_first_peak_rsi']), 2),
+                'second_peak_date': format_peak_date(row['divergence_second_peak_date'], timeframe),
+                'second_peak_price': round(float(row['divergence_second_peak_price']), 2),
+                'second_peak_rsi': round(float(row['divergence_second_peak_rsi']), 2)
             }
             signals.append(signal)
 

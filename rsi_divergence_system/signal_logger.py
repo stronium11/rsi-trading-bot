@@ -26,9 +26,11 @@ class SignalLogger:
             'ticker',
             'timeframe',
             'divergence_type',
+            'first_peak_date',
             'first_peak_price',
-            'second_peak_price',
             'first_peak_rsi',
+            'second_peak_date',
+            'second_peak_price',
             'second_peak_rsi'
         ]
         self._ensure_csv_exists()
@@ -63,9 +65,11 @@ class SignalLogger:
                 'ticker': signal['ticker'],
                 'timeframe': signal['timeframe'],
                 'divergence_type': signal['divergence_type'],
+                'first_peak_date': signal['first_peak_date'],
                 'first_peak_price': signal['first_peak_price'],
-                'second_peak_price': signal['second_peak_price'],
                 'first_peak_rsi': signal['first_peak_rsi'],
+                'second_peak_date': signal['second_peak_date'],
+                'second_peak_price': signal['second_peak_price'],
                 'second_peak_rsi': signal['second_peak_rsi']
             })
 
