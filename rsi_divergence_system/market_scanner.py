@@ -62,8 +62,12 @@ class MarketScanner:
             if df.empty:
                 return None
 
+            # Handle MultiIndex columns (newer yfinance versions)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+
             # Rename columns to lowercase
-            df.columns = df.columns.str.lower()
+            df.columns = [col.lower() for col in df.columns]
 
             # Resample for 4h and 3d timeframes
             if timeframe == '4h' and interval == '1h':
