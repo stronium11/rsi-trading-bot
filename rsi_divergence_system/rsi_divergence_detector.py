@@ -39,7 +39,8 @@ def calculate_rsi(df, rsi_period=14):
     return rsi
 
 
-def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff_pct=1.0, min_distance=6):
+def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff_pct=1.0, min_distance=6,
+                      rsi_overbought=75, rsi_oversold=25):
     """
     Detect bullish and bearish divergences between price and a given indicator,
     across longer ranges.
@@ -51,6 +52,8 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
     - lookback: how many bars back to compare for divergence.
     - min_price_diff_pct: minimum price difference percentage between peaks (default: 1.0%)
     - min_distance: minimum number of candles between peaks (default: 6)
+    - rsi_overbought: RSI level for overbought (default: 75)
+    - rsi_oversold: RSI level for oversold (default: 25)
 
     Returns:
     - df with divergence columns and divergence details
@@ -84,10 +87,16 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
                 # Calculate price difference percentage
                 price_diff_pct = abs((price_i - price_j) / price_j) * 100
 
-                # Check divergence conditions and minimum price difference
+                # Get RSI values for both peaks
+                rsi_j = df['indicator'].iloc[j]
+                rsi_i = df['indicator'].iloc[i]
+
+                # Check divergence conditions, minimum price difference, and overbought zone
+                # At least one RSI peak must be in overbought zone (>= 75)
                 if (df['close'].iloc[i] > df['close'].iloc[j] and
                     df['indicator'].iloc[i] < df['indicator'].iloc[j] and
-                    price_diff_pct >= min_price_diff_pct):
+                    price_diff_pct >= min_price_diff_pct and
+                    (rsi_j >= rsi_overbought or rsi_i >= rsi_overbought)):
 
                     df.at[df.index[i], 'bearish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
@@ -117,10 +126,16 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
                 # Calculate price difference percentage
                 price_diff_pct = abs((price_i - price_j) / price_j) * 100
 
-                # Check divergence conditions and minimum price difference
+                # Get RSI values for both peaks
+                rsi_j = df['indicator'].iloc[j]
+                rsi_i = df['indicator'].iloc[i]
+
+                # Check divergence conditions, minimum price difference, and oversold zone
+                # At least one RSI peak must be in oversold zone (<= 25)
                 if (df['close'].iloc[i] < df['close'].iloc[j] and
                     df['indicator'].iloc[i] > df['indicator'].iloc[j] and
-                    price_diff_pct >= min_price_diff_pct):
+                    price_diff_pct >= min_price_diff_pct and
+                    (rsi_j <= rsi_oversold or rsi_i <= rsi_oversold)):
 
                     df.at[df.index[i], 'bullish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
