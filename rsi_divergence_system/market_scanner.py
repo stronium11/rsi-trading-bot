@@ -57,7 +57,7 @@ class MarketScanner:
             elif timeframe == '3d':
                 period = '1y'   # Longer period for 3d timeframe
 
-            df = yf.download(ticker, period=period, interval=interval, progress=False)
+            df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
 
             if df.empty:
                 return None

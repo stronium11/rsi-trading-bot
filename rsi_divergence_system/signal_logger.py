@@ -73,7 +73,12 @@ class SignalLogger:
 
         # Append to existing CSV
         existing_df = pd.read_csv(self.csv_path)
-        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+
+        # Combine dataframes
+        if existing_df.empty:
+            combined_df = new_df
+        else:
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
 
         # Remove duplicates based on all columns
         combined_df = combined_df.drop_duplicates()
