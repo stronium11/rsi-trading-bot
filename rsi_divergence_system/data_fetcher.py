@@ -26,7 +26,6 @@ def get_nasdaq100_tickers() -> List[str]:
     ]
 
     try:
-        # Try to fetch from Wikipedia
         tables = pd.read_html(config.NASDAQ_100_URL)
         df = tables[4]
         tickers = df['Ticker'].tolist()
@@ -38,14 +37,13 @@ def get_nasdaq100_tickers() -> List[str]:
         return nasdaq100_tickers
 
 
-def fetch_stock_data(ticker: str, timeframe: str, period: str = config.DATA_PERIOD) -> pd.DataFrame:
+def fetch_stock_data(ticker: str, timeframe: str) -> pd.DataFrame:
     """
     Fetch historical price data for a ticker at specific timeframe
 
     Args:
         ticker: Stock ticker symbol
         timeframe: '1h', '4h', '1d', '3d'
-        period: Period of data to fetch
 
     Returns:
         DataFrame with OHLCV data
@@ -53,21 +51,14 @@ def fetch_stock_data(ticker: str, timeframe: str, period: str = config.DATA_PERI
     try:
         stock = yf.Ticker(ticker)
 
-        # Map timeframes to yfinance intervals
-        interval_map = {
-            '1h': '1h',
-            '4h': '1h',  # We'll resample 1h to 4h
-            '1d': '1d',
-            '3d': '1d'   # We'll resample 1d to 3d
-        }
-
-        # Adjust period for hourly data
+        # Map timeframes
         if timeframe in ['1h', '4h']:
-            period = '60d'  # Max for hourly is ~730 days, use 60 for speed
+            interval = '1h'
+            period = config.DATA_PERIOD_HOURLY
         else:
-            period = '1y'
+            interval = '1d'
+            period = config.DATA_PERIOD_DAILY
 
-        interval = interval_map.get(timeframe, '1d')
         df = stock.history(period=period, interval=interval)
 
         if df.empty:
@@ -94,5 +85,4 @@ def fetch_stock_data(ticker: str, timeframe: str, period: str = config.DATA_PERI
         return df
 
     except Exception as e:
-        print(f"Error fetching {ticker} at {timeframe}: {e}")
         return pd.DataFrame()

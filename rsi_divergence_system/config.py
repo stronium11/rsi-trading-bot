@@ -13,7 +13,8 @@ DIVERGENCE_ORDER = 5  # Controls local extrema sensitivity
 DIVERGENCE_LOOKBACK = 20  # How many bars back to compare
 
 # Data fetching
-DATA_PERIOD = '60d'  # 60 days for hourly data
+DATA_PERIOD_HOURLY = '60d'  # 60 days for hourly data
+DATA_PERIOD_DAILY = '1y'    # 1 year for daily data
 
 # Output
 OUTPUT_FILE = 'rsi_divergence_signals.csv'
