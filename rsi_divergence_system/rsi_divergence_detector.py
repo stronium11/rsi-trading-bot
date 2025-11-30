@@ -39,7 +39,7 @@ def calculate_rsi(df, rsi_period=14):
     return rsi
 
 
-def detect_divergence(df, indicator_values, order=5, lookback=20):
+def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff_pct=1.0):
     """
     Detect bullish and bearish divergences between price and a given indicator,
     across longer ranges.
@@ -49,6 +49,7 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
     - indicator_values: Series with indicator values (e.g., RSI).
     - order: controls local extrema sensitivity.
     - lookback: how many bars back to compare for divergence.
+    - min_price_diff_pct: minimum price difference percentage between peaks (default: 1.0%)
 
     Returns:
     - df with divergence columns and divergence details
@@ -76,7 +77,17 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
     for i in price_max_idx:
         for j in price_max_idx:
             if j < i and (i - j) <= lookback:
-                if df['close'].iloc[i] > df['close'].iloc[j] and df['indicator'].iloc[i] < df['indicator'].iloc[j]:
+                price_j = df['close'].iloc[j]
+                price_i = df['close'].iloc[i]
+
+                # Calculate price difference percentage
+                price_diff_pct = abs((price_i - price_j) / price_j) * 100
+
+                # Check divergence conditions and minimum price difference
+                if (df['close'].iloc[i] > df['close'].iloc[j] and
+                    df['indicator'].iloc[i] < df['indicator'].iloc[j] and
+                    price_diff_pct >= min_price_diff_pct):
+
                     df.at[df.index[i], 'bearish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
                     # Convert to timezone-naive datetime
@@ -99,7 +110,17 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
     for i in price_min_idx:
         for j in price_min_idx:
             if j < i and (i - j) <= lookback:
-                if df['close'].iloc[i] < df['close'].iloc[j] and df['indicator'].iloc[i] > df['indicator'].iloc[j]:
+                price_j = df['close'].iloc[j]
+                price_i = df['close'].iloc[i]
+
+                # Calculate price difference percentage
+                price_diff_pct = abs((price_i - price_j) / price_j) * 100
+
+                # Check divergence conditions and minimum price difference
+                if (df['close'].iloc[i] < df['close'].iloc[j] and
+                    df['indicator'].iloc[i] > df['indicator'].iloc[j] and
+                    price_diff_pct >= min_price_diff_pct):
+
                     df.at[df.index[i], 'bullish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
                     # Convert to timezone-naive datetime
