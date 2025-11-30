@@ -72,7 +72,7 @@ class MarketScanner:
 
             # Resample for 4h timeframe
             if timeframe == '4h' and interval == '1h':
-                df = df.resample('4H').agg({
+                df = df.resample('4h').agg({
                     'open': 'first',
                     'high': 'max',
                     'low': 'min',

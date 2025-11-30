@@ -79,10 +79,18 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
                 if df['close'].iloc[i] > df['close'].iloc[j] and df['indicator'].iloc[i] < df['indicator'].iloc[j]:
                     df.at[df.index[i], 'bearish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
-                    df.at[df.index[i], 'divergence_first_peak_date'] = df.index[j]
+                    # Convert to timezone-naive datetime
+                    first_date = pd.Timestamp(df.index[j])
+                    if first_date.tz is not None:
+                        first_date = first_date.tz_localize(None)
+                    df.at[df.index[i], 'divergence_first_peak_date'] = first_date
                     df.at[df.index[i], 'divergence_first_peak_price'] = df['close'].iloc[j]
                     df.at[df.index[i], 'divergence_first_peak_rsi'] = df['indicator'].iloc[j]
-                    df.at[df.index[i], 'divergence_second_peak_date'] = df.index[i]
+                    # Convert to timezone-naive datetime
+                    second_date = pd.Timestamp(df.index[i])
+                    if second_date.tz is not None:
+                        second_date = second_date.tz_localize(None)
+                    df.at[df.index[i], 'divergence_second_peak_date'] = second_date
                     df.at[df.index[i], 'divergence_second_peak_price'] = df['close'].iloc[i]
                     df.at[df.index[i], 'divergence_second_peak_rsi'] = df['indicator'].iloc[i]
                     break  # only need one valid divergence
@@ -94,10 +102,18 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
                 if df['close'].iloc[i] < df['close'].iloc[j] and df['indicator'].iloc[i] > df['indicator'].iloc[j]:
                     df.at[df.index[i], 'bullish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
-                    df.at[df.index[i], 'divergence_first_peak_date'] = df.index[j]
+                    # Convert to timezone-naive datetime
+                    first_date = pd.Timestamp(df.index[j])
+                    if first_date.tz is not None:
+                        first_date = first_date.tz_localize(None)
+                    df.at[df.index[i], 'divergence_first_peak_date'] = first_date
                     df.at[df.index[i], 'divergence_first_peak_price'] = df['close'].iloc[j]
                     df.at[df.index[i], 'divergence_first_peak_rsi'] = df['indicator'].iloc[j]
-                    df.at[df.index[i], 'divergence_second_peak_date'] = df.index[i]
+                    # Convert to timezone-naive datetime
+                    second_date = pd.Timestamp(df.index[i])
+                    if second_date.tz is not None:
+                        second_date = second_date.tz_localize(None)
+                    df.at[df.index[i], 'divergence_second_peak_date'] = second_date
                     df.at[df.index[i], 'divergence_second_peak_price'] = df['close'].iloc[i]
                     df.at[df.index[i], 'divergence_second_peak_rsi'] = df['indicator'].iloc[i]
                     break
