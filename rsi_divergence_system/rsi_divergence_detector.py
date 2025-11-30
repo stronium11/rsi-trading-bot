@@ -40,7 +40,7 @@ def calculate_rsi(df, rsi_period=14):
 
 
 def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff_pct=1.0, min_distance=6,
-                      rsi_overbought=75, rsi_oversold=25):
+                      rsi_overbought=75, rsi_oversold=25, max_rsi_retracement=15):
     """
     Detect bullish and bearish divergences between price and a given indicator,
     across longer ranges.
@@ -54,6 +54,7 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
     - min_distance: minimum number of candles between peaks (default: 6)
     - rsi_overbought: RSI level for overbought (default: 75)
     - rsi_oversold: RSI level for oversold (default: 25)
+    - max_rsi_retracement: maximum RSI points allowed to travel in opposite direction (default: 15)
 
     Returns:
     - df with divergence columns and divergence details
@@ -90,6 +91,15 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
                 # Get RSI values for both peaks
                 rsi_j = df['indicator'].iloc[j]
                 rsi_i = df['indicator'].iloc[i]
+
+                # Check for weak divergence: RSI retracement filter
+                # For bearish divergence, check if RSI went too far DOWN (opposite direction) between peaks
+                rsi_between = df['indicator'].iloc[j:i+1]
+                min_rsi_between = rsi_between.min()
+
+                # If RSI dropped more than 15 points from first peak, it's a weak divergence
+                if min_rsi_between < rsi_j - max_rsi_retracement:
+                    continue  # Skip this weak divergence
 
                 # Check divergence conditions, minimum price difference, and overbought zone
                 # At least one RSI peak must be in overbought zone (>= 75)
@@ -129,6 +139,17 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
                 # Get RSI values for both peaks
                 rsi_j = df['indicator'].iloc[j]
                 rsi_i = df['indicator'].iloc[i]
+
+                # Check for weak divergence: RSI retracement filter
+                # For bullish divergence, check if RSI went too far UP (opposite direction) between peaks
+                # Exception: If both peaks are deeply oversold (<= 25), ignore this rule
+                if not (rsi_j <= rsi_oversold and rsi_i <= rsi_oversold):
+                    rsi_between = df['indicator'].iloc[j:i+1]
+                    max_rsi_between = rsi_between.max()
+
+                    # If RSI rose more than 15 points from first peak, it's a weak divergence
+                    if max_rsi_between > rsi_j + max_rsi_retracement:
+                        continue  # Skip this weak divergence
 
                 # Check divergence conditions, minimum price difference, and oversold zone
                 # At least one RSI peak must be in oversold zone (<= 25)
