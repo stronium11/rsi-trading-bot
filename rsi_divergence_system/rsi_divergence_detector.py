@@ -104,11 +104,11 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
                         continue  # Skip this weak divergence
 
                 # Check divergence conditions, minimum price difference, and overbought zone
-                # At least one RSI peak must be in overbought zone (>= 75)
+                # BOTH RSI peaks must be in overbought zone (>= 75)
                 if (df['close'].iloc[i] > df['close'].iloc[j] and
                     df['indicator'].iloc[i] < df['indicator'].iloc[j] and
                     price_diff_pct >= min_price_diff_pct and
-                    (rsi_j >= rsi_overbought or rsi_i >= rsi_overbought)):
+                    (rsi_j >= rsi_overbought and rsi_i >= rsi_overbought)):
 
                     df.at[df.index[i], 'bearish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
@@ -154,11 +154,11 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
                         continue  # Skip this weak divergence
 
                 # Check divergence conditions, minimum price difference, and oversold zone
-                # At least one RSI peak must be in oversold zone (<= 25)
+                # BOTH RSI peaks must be in oversold zone (<= 25)
                 if (df['close'].iloc[i] < df['close'].iloc[j] and
                     df['indicator'].iloc[i] > df['indicator'].iloc[j] and
                     price_diff_pct >= min_price_diff_pct and
-                    (rsi_j <= rsi_oversold or rsi_i <= rsi_oversold)):
+                    (rsi_j <= rsi_oversold and rsi_i <= rsi_oversold)):
 
                     df.at[df.index[i], 'bullish_divergence'] = True
                     df.at[df.index[i], 'divergence_first_peak_idx'] = j
