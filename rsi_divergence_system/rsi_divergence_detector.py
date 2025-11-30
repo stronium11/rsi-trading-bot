@@ -5,13 +5,12 @@ Detects bullish and bearish divergences between price and RSI indicator
 
 import pandas as pd
 import numpy as np
-from ta.momentum import RSIIndicator
 from scipy.signal import argrelextrema
 
 
 def calculate_rsi(df, rsi_period=14):
     """
-    Calculate RSI indicator for given price data
+    Calculate RSI indicator for given price data using custom implementation
 
     Parameters:
     - df: DataFrame with 'close' prices
@@ -20,8 +19,24 @@ def calculate_rsi(df, rsi_period=14):
     Returns:
     - Series with RSI values
     """
-    rsi = RSIIndicator(df['close'], window=rsi_period)
-    return rsi.rsi()
+    close = df['close'].copy()
+
+    # Calculate price changes
+    delta = close.diff()
+
+    # Separate gains and losses
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    # Calculate average gain and average loss using EMA
+    avg_gain = gain.ewm(com=rsi_period - 1, min_periods=rsi_period).mean()
+    avg_loss = loss.ewm(com=rsi_period - 1, min_periods=rsi_period).mean()
+
+    # Calculate RS and RSI
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
 
 
 def detect_divergence(df, indicator_values, order=5, lookback=20):
