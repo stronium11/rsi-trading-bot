@@ -19,17 +19,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Scan all Nasdaq 100 tickers across all timeframes
+  # Scan all Nasdaq 100 tickers across all timeframes (4h, 1d, 1w)
   python main.py
 
   # Scan a single ticker
   python main.py --ticker AAPL
 
   # Scan specific timeframes only
-  python main.py --timeframes 1h 1d
+  python main.py --timeframes 4h 1d
 
   # Scan a single ticker with specific timeframes
-  python main.py --ticker TSLA --timeframes 1h 4h
+  python main.py --ticker TSLA --timeframes 1d 1w
 
   # View recent signals
   python main.py --view-signals 20
@@ -46,8 +46,8 @@ Examples:
         '--timeframes',
         type=str,
         nargs='+',
-        choices=['1h', '4h', '1d', '3d'],
-        help='Specific timeframes to scan (default: all)'
+        choices=['4h', '1d', '1w'],
+        help='Specific timeframes to scan (default: 4h, 1d, 1w)'
     )
 
     parser.add_argument(

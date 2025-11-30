@@ -99,48 +99,71 @@ def detect_divergence(df, indicator_values, order=5, lookback=20):
     return df
 
 
-def extract_divergence_signals(df, ticker, timeframe):
+def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
     """
     Extract divergence signals from processed DataFrame
 
     Parameters:
     - df: DataFrame with divergence detection results
     - ticker: Stock ticker symbol
-    - timeframe: Timeframe of the data (e.g., '1h', '4h', '1d', '3d')
+    - timeframe: Timeframe of the data (e.g., '4h', '1d', '1w')
+    - max_days_old: Maximum age of signals in trading days (default: 30)
 
     Returns:
     - List of signal dictionaries
     """
     signals = []
 
+    # Calculate the cutoff date (30 trading days ago)
+    # Get the last index date and subtract based on number of bars
+    if len(df) == 0:
+        return signals
+
+    # Use the most recent date in the dataframe as reference
+    most_recent_date = df.index[-1]
+
     # Extract bearish divergences
     bearish = df[df['bearish_divergence'] == True]
     for idx, row in bearish.iterrows():
-        signal = {
-            'date': idx,
-            'ticker': ticker,
-            'timeframe': timeframe,
-            'divergence_type': 'Bearish',
-            'first_peak_price': row['divergence_first_peak_price'],
-            'second_peak_price': row['divergence_second_peak_price'],
-            'first_peak_rsi': row['divergence_first_peak_rsi'],
-            'second_peak_rsi': row['divergence_second_peak_rsi']
-        }
-        signals.append(signal)
+        # Calculate trading days difference
+        idx_position = df.index.get_loc(idx)
+        most_recent_position = len(df) - 1
+        bars_ago = most_recent_position - idx_position
+
+        # Only include signals from the last 30 trading days
+        if bars_ago <= max_days_old:
+            signal = {
+                'date': idx,
+                'ticker': ticker,
+                'timeframe': timeframe,
+                'divergence_type': 'Bearish',
+                'first_peak_price': row['divergence_first_peak_price'],
+                'second_peak_price': row['divergence_second_peak_price'],
+                'first_peak_rsi': row['divergence_first_peak_rsi'],
+                'second_peak_rsi': row['divergence_second_peak_rsi']
+            }
+            signals.append(signal)
 
     # Extract bullish divergences
     bullish = df[df['bullish_divergence'] == True]
     for idx, row in bullish.iterrows():
-        signal = {
-            'date': idx,
-            'ticker': ticker,
-            'timeframe': timeframe,
-            'divergence_type': 'Bullish',
-            'first_peak_price': row['divergence_first_peak_price'],
-            'second_peak_price': row['divergence_second_peak_price'],
-            'first_peak_rsi': row['divergence_first_peak_rsi'],
-            'second_peak_rsi': row['divergence_second_peak_rsi']
-        }
-        signals.append(signal)
+        # Calculate trading days difference
+        idx_position = df.index.get_loc(idx)
+        most_recent_position = len(df) - 1
+        bars_ago = most_recent_position - idx_position
+
+        # Only include signals from the last 30 trading days
+        if bars_ago <= max_days_old:
+            signal = {
+                'date': idx,
+                'ticker': ticker,
+                'timeframe': timeframe,
+                'divergence_type': 'Bullish',
+                'first_peak_price': row['divergence_first_peak_price'],
+                'second_peak_price': row['divergence_second_peak_price'],
+                'first_peak_rsi': row['divergence_first_peak_rsi'],
+                'second_peak_rsi': row['divergence_second_peak_rsi']
+            }
+            signals.append(signal)
 
     return signals

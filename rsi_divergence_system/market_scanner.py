@@ -25,7 +25,7 @@ class MarketScanner:
         - logger: SignalLogger instance (optional)
         """
         self.logger = logger or SignalLogger()
-        self.timeframes = ['1h', '4h', '1d', '3d']
+        self.timeframes = ['4h', '1d', '1w']
         self.tickers = get_nasdaq100_tickers()
 
     def fetch_data(self, ticker, timeframe, period='3mo'):
@@ -43,19 +43,20 @@ class MarketScanner:
         try:
             # Map timeframes to yfinance intervals
             interval_map = {
-                '1h': '1h',
-                '4h': '4h',  # Note: yfinance doesn't have 4h, we'll use 1h and resample
+                '4h': '1h',  # yfinance doesn't have 4h, we'll use 1h and resample
                 '1d': '1d',
-                '3d': '1d'   # We'll resample daily data to 3d
+                '1w': '1wk'
             }
 
             interval = interval_map.get(timeframe, '1d')
 
             # Adjust period based on timeframe
-            if timeframe in ['1h', '4h']:
+            if timeframe == '4h':
                 period = '60d'  # Max for hourly data
-            elif timeframe == '3d':
-                period = '1y'   # Longer period for 3d timeframe
+            elif timeframe == '1d':
+                period = '6mo'  # 6 months for daily
+            elif timeframe == '1w':
+                period = '2y'   # 2 years for weekly
 
             df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
 
@@ -69,17 +70,9 @@ class MarketScanner:
             # Rename columns to lowercase
             df.columns = [col.lower() for col in df.columns]
 
-            # Resample for 4h and 3d timeframes
+            # Resample for 4h timeframe
             if timeframe == '4h' and interval == '1h':
                 df = df.resample('4H').agg({
-                    'open': 'first',
-                    'high': 'max',
-                    'low': 'min',
-                    'close': 'last',
-                    'volume': 'sum'
-                }).dropna()
-            elif timeframe == '3d' and interval == '1d':
-                df = df.resample('3D').agg({
                     'open': 'first',
                     'high': 'max',
                     'low': 'min',
