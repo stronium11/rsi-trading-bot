@@ -126,7 +126,7 @@ def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
         return signals
 
     # Helper function to format dates based on timeframe
-    def format_peak_date(date, timeframe):
+    def format_date(date, timeframe):
         """Format date based on timeframe: 4h includes hour, 1d+ only shows date"""
         if pd.isna(date):
             return None
@@ -151,14 +151,14 @@ def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
         # Only include signals from the last 30 trading days
         if bars_ago <= max_days_old:
             signal = {
-                'date': idx,
+                'date': format_date(idx, timeframe),
                 'ticker': ticker,
                 'timeframe': timeframe,
                 'divergence_type': 'Bearish',
-                'first_peak_date': format_peak_date(row['divergence_first_peak_date'], timeframe),
+                'first_peak_date': format_date(row['divergence_first_peak_date'], timeframe),
                 'first_peak_price': round(float(row['divergence_first_peak_price']), 2),
                 'first_peak_rsi': round(float(row['divergence_first_peak_rsi']), 2),
-                'second_peak_date': format_peak_date(row['divergence_second_peak_date'], timeframe),
+                'second_peak_date': format_date(row['divergence_second_peak_date'], timeframe),
                 'second_peak_price': round(float(row['divergence_second_peak_price']), 2),
                 'second_peak_rsi': round(float(row['divergence_second_peak_rsi']), 2)
             }
@@ -175,14 +175,14 @@ def extract_divergence_signals(df, ticker, timeframe, max_days_old=30):
         # Only include signals from the last 30 trading days
         if bars_ago <= max_days_old:
             signal = {
-                'date': idx,
+                'date': format_date(idx, timeframe),
                 'ticker': ticker,
                 'timeframe': timeframe,
                 'divergence_type': 'Bullish',
-                'first_peak_date': format_peak_date(row['divergence_first_peak_date'], timeframe),
+                'first_peak_date': format_date(row['divergence_first_peak_date'], timeframe),
                 'first_peak_price': round(float(row['divergence_first_peak_price']), 2),
                 'first_peak_rsi': round(float(row['divergence_first_peak_rsi']), 2),
-                'second_peak_date': format_peak_date(row['divergence_second_peak_date'], timeframe),
+                'second_peak_date': format_date(row['divergence_second_peak_date'], timeframe),
                 'second_peak_price': round(float(row['divergence_second_peak_price']), 2),
                 'second_peak_rsi': round(float(row['divergence_second_peak_rsi']), 2)
             }
