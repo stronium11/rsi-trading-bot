@@ -83,8 +83,11 @@ class SignalLogger:
         # Remove duplicates based on all columns
         combined_df = combined_df.drop_duplicates()
 
-        # Convert detection_date to datetime for proper sorting
-        combined_df['detection_date'] = pd.to_datetime(combined_df['detection_date'])
+        # Convert detection_date to datetime for proper sorting (UTC to handle timezones)
+        combined_df['detection_date'] = pd.to_datetime(combined_df['detection_date'], utc=True)
+
+        # Remove timezone info to avoid comparison issues
+        combined_df['detection_date'] = combined_df['detection_date'].dt.tz_localize(None)
 
         # Sort by detection date
         combined_df = combined_df.sort_values('detection_date', ascending=False)
