@@ -39,7 +39,7 @@ def calculate_rsi(df, rsi_period=14):
     return rsi
 
 
-def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff_pct=1.0):
+def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff_pct=1.0, min_distance=6):
     """
     Detect bullish and bearish divergences between price and a given indicator,
     across longer ranges.
@@ -50,6 +50,7 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
     - order: controls local extrema sensitivity.
     - lookback: how many bars back to compare for divergence.
     - min_price_diff_pct: minimum price difference percentage between peaks (default: 1.0%)
+    - min_distance: minimum number of candles between peaks (default: 6)
 
     Returns:
     - df with divergence columns and divergence details
@@ -76,7 +77,7 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
     # Bearish divergence (price HH, indicator LH)
     for i in price_max_idx:
         for j in price_max_idx:
-            if j < i and (i - j) <= lookback:
+            if j < i and (i - j) >= min_distance and (i - j) <= lookback:
                 price_j = df['close'].iloc[j]
                 price_i = df['close'].iloc[i]
 
@@ -109,7 +110,7 @@ def detect_divergence(df, indicator_values, order=5, lookback=20, min_price_diff
     # Bullish divergence (price LL, indicator HL)
     for i in price_min_idx:
         for j in price_min_idx:
-            if j < i and (i - j) <= lookback:
+            if j < i and (i - j) >= min_distance and (i - j) <= lookback:
                 price_j = df['close'].iloc[j]
                 price_i = df['close'].iloc[i]
 
