@@ -83,8 +83,14 @@ class SignalLogger:
         # Remove duplicates based on all columns
         combined_df = combined_df.drop_duplicates()
 
+        # Convert detection_date to datetime for proper sorting
+        combined_df['detection_date'] = pd.to_datetime(combined_df['detection_date'])
+
         # Sort by detection date
         combined_df = combined_df.sort_values('detection_date', ascending=False)
+
+        # Convert detection_date back to string for CSV storage
+        combined_df['detection_date'] = combined_df['detection_date'].astype(str)
 
         # Save to CSV
         combined_df.to_csv(self.csv_path, index=False)
