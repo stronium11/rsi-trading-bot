@@ -15,11 +15,11 @@ def main():
     Main function to run the RSI divergence scanner
     """
     parser = argparse.ArgumentParser(
-        description='RSI Divergence Detection System for Nasdaq 100',
+        description='RSI Divergence Detection System for Nasdaq 100 + S&P 500',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Scan all Nasdaq 100 tickers across all timeframes (4h, 1d, 1w)
+  # Scan all Nasdaq 100 + S&P 500 stocks across all timeframes (4h, 1d, 1w)
   python main.py
 
   # Scan a single ticker

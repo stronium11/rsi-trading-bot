@@ -10,6 +10,7 @@ import time
 from rsi_divergence_detector import calculate_rsi, detect_divergence, extract_divergence_signals
 from signal_logger import SignalLogger
 from nasdaq100_tickers import get_nasdaq100_tickers
+from sp500_tickers import get_sp500_tickers
 
 
 class MarketScanner:
@@ -26,7 +27,12 @@ class MarketScanner:
         """
         self.logger = logger or SignalLogger()
         self.timeframes = ['4h', '1d', '1w']
-        self.tickers = get_nasdaq100_tickers()
+
+        # Combine Nasdaq 100 and S&P 500 tickers, remove duplicates
+        nasdaq_tickers = get_nasdaq100_tickers()
+        sp500_tickers = get_sp500_tickers()
+        combined = list(set(nasdaq_tickers + sp500_tickers))
+        self.tickers = sorted(combined)  # Sort alphabetically for consistent order
 
     def fetch_data(self, ticker, timeframe, period='3mo'):
         """
@@ -145,7 +151,8 @@ class MarketScanner:
         print(f"\n{'='*60}")
         print(f"RSI DIVERGENCE SCANNER")
         print(f"{'='*60}")
-        print(f"Scanning {len(self.tickers)} tickers across {len(timeframes)} timeframes")
+        print(f"Scanning Nasdaq 100 + S&P 500 stocks")
+        print(f"Total unique tickers: {len(self.tickers)}")
         print(f"Timeframes: {', '.join(timeframes)}")
         print(f"Started at: {scan_stats['start_time'].strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*60}\n")
