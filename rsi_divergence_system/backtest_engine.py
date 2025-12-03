@@ -7,6 +7,8 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 import numpy as np
+import gc
+import time
 
 
 class Trade:
@@ -341,8 +343,17 @@ class BacktestEngine:
             trade = self.simulate_trade(signal)
             self.trades.append(trade)
 
+            # Progress update and resource cleanup every 10 trades
             if (idx + 1) % 10 == 0:
                 print(f"Processed {idx + 1}/{len(self.signals_df)} trades...")
+                # Force garbage collection to close file handles
+                gc.collect()
+                time.sleep(0.1)  # Small delay to allow connections to close
+
+            # More aggressive cleanup every 50 trades on Mac (file handle limit)
+            if (idx + 1) % 50 == 0:
+                gc.collect()
+                time.sleep(0.5)
 
         print(f"\n{'='*70}")
         print(f"BACKTEST COMPLETE")
@@ -350,6 +361,9 @@ class BacktestEngine:
         print(f"Total trades simulated: {len(self.trades)}")
         print(f"Duration: {datetime.now() - start_time}")
         print(f"{'='*70}\n")
+
+        # Final cleanup
+        gc.collect()
 
         return self.trades
 
@@ -367,9 +381,26 @@ class BacktestEngine:
             results.append(summary)
 
         df_results = pd.DataFrame(results)
-        df_results.to_csv(output_csv, index=False)
 
-        print(f"Results saved to: {output_csv}")
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(output_csv), exist_ok=True)
+
+        # Force garbage collection before writing
+        gc.collect()
+        time.sleep(0.5)
+
+        # Write results
+        try:
+            df_results.to_csv(output_csv, index=False)
+            print(f"Results saved to: {output_csv}")
+        except Exception as e:
+            print(f"Error saving results: {e}")
+            # Try alternative approach
+            print("Attempting alternative save method...")
+            with open(output_csv, 'w') as f:
+                df_results.to_csv(f, index=False)
+            print(f"Results saved to: {output_csv}")
+
         return df_results
 
 
