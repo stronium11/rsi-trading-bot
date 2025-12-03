@@ -22,7 +22,7 @@ class BacktestScanner:
         """
         Initialize the backtest scanner
         """
-        self.timeframes = ['1d', '3d', '1w']  # Only daily and weekly for backtesting
+        self.timeframes = ['1d', '3d']  # Only 1d and 3d timeframes for backtesting
 
         # Combine Nasdaq 100 and S&P 500 tickers, remove duplicates
         nasdaq_tickers = get_nasdaq100_tickers()
@@ -126,31 +126,7 @@ class BacktestScanner:
         if len(df) == 0:
             return signals
 
-        # Extract bearish divergences
-        bearish = df[df['bearish_divergence'] == True]
-        for idx, row in bearish.iterrows():
-            # Get next day's entry price
-            entry_date, entry_price = self.get_next_trading_day_close(df, idx)
-
-            if entry_date is None:
-                continue  # Skip if no next trading day available
-
-            signal = {
-                'ticker': ticker,
-                'timeframe': timeframe,
-                'signal_date': idx,
-                'divergence_type': 'Bearish',
-                'signal_close': float(df.loc[idx, 'close']),
-                'entry_date': entry_date,
-                'entry_price': entry_price,
-                'first_peak_price': float(row['divergence_first_peak_price']),
-                'second_peak_price': float(row['divergence_second_peak_price']),
-                'first_peak_rsi': float(row['divergence_first_peak_rsi']),
-                'second_peak_rsi': float(row['divergence_second_peak_rsi'])
-            }
-            signals.append(signal)
-
-        # Extract bullish divergences
+        # Only extract bullish divergences (ignore bearish)
         bullish = df[df['bullish_divergence'] == True]
         for idx, row in bullish.iterrows():
             # Get next day's entry price
@@ -227,6 +203,7 @@ class BacktestScanner:
         print(f"Scanning Nasdaq 100 + S&P 500 stocks")
         print(f"Total unique tickers: {len(self.tickers)}")
         print(f"Timeframes: {', '.join(self.timeframes)}")
+        print(f"Divergence type: Bullish only")
         print(f"Period: 5 years of historical data")
         print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*70}\n")
