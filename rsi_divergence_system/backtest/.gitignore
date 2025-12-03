@@ -1,0 +1,8 @@
+# Exclude test files
+test_*.csv
+test_reports/
+
+# Exclude actual backtest result files (these will be generated)
+backtest_signals.csv
+backtest_results.csv
+reports/
