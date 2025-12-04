@@ -4,13 +4,13 @@ Scans 5 years of historical data for RSI divergences
 Used for backtesting trading strategies
 """
 
-import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import time
 from rsi_divergence_detector import calculate_rsi, detect_divergence
 from nasdaq100_tickers import get_nasdaq100_tickers
 from sp500_tickers import get_sp500_tickers
+from data_fetcher import get_data_fetcher
 
 
 class BacktestScanner:
@@ -30,51 +30,30 @@ class BacktestScanner:
         combined = list(set(nasdaq_tickers + sp500_tickers))
         self.tickers = sorted(combined)
 
+        # Initialize Finnhub data fetcher
+        self.data_fetcher = get_data_fetcher()
+
     def fetch_historical_data(self, ticker, timeframe):
         """
-        Fetch 5 years of historical data
+        Fetch 5 years of historical data using Finnhub
 
         Parameters:
         - ticker: Stock ticker symbol
-        - timeframe: Timeframe interval (1d, 3d, 1w)
+        - timeframe: Timeframe interval (1d, 3d)
 
         Returns:
         - DataFrame with historical data or None if error
         """
         try:
-            # Map timeframes to yfinance intervals
-            interval_map = {
-                '1d': '1d',
-                '3d': '1d',  # Will resample daily to 3d
-                '1w': '1wk'
-            }
+            # Fetch 5 years of daily data from Finnhub
+            df = self.data_fetcher.fetch_historical_data(ticker, period='5y')
 
-            interval = interval_map.get(timeframe, '1d')
-
-            # Fetch 5 years of data
-            period = '5y'
-
-            df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
-
-            if df.empty:
+            if df is None or len(df) == 0:
                 return None
 
-            # Handle MultiIndex columns (newer yfinance versions)
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            # Rename columns to lowercase
-            df.columns = [col.lower() for col in df.columns]
-
-            # Resample for 3d timeframe
-            if timeframe == '3d' and interval == '1d':
-                df = df.resample('3D').agg({
-                    'open': 'first',
-                    'high': 'max',
-                    'low': 'min',
-                    'close': 'last',
-                    'volume': 'sum'
-                }).dropna()
+            # Resample for 3d timeframe if needed
+            if timeframe == '3d':
+                df = self.data_fetcher.resample_to_3d(df)
 
             return df
 

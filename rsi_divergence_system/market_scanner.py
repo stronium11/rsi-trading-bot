@@ -3,7 +3,6 @@ Market Scanner Module
 Scans market data for RSI divergences across multiple tickers and timeframes
 """
 
-import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -11,6 +10,7 @@ from rsi_divergence_detector import calculate_rsi, detect_divergence, extract_di
 from signal_logger import SignalLogger
 from nasdaq100_tickers import get_nasdaq100_tickers
 from sp500_tickers import get_sp500_tickers
+from data_fetcher import get_data_fetcher
 
 
 class MarketScanner:
@@ -34,57 +34,47 @@ class MarketScanner:
         combined = list(set(nasdaq_tickers + sp500_tickers))
         self.tickers = sorted(combined)  # Sort alphabetically for consistent order
 
+        # Initialize Finnhub data fetcher
+        self.data_fetcher = get_data_fetcher()
+
     def fetch_data(self, ticker, timeframe, period='3mo'):
         """
-        Fetch market data for a ticker and timeframe
+        Fetch market data for a ticker and timeframe using Finnhub
+
+        NOTE: Finnhub free tier only supports daily data (no intraday/hourly).
+        4h timeframe is not supported with Finnhub free tier.
 
         Parameters:
         - ticker: Stock ticker symbol
-        - timeframe: Timeframe interval
+        - timeframe: Timeframe interval (1d or 1w supported)
         - period: Data period to fetch
 
         Returns:
         - DataFrame with market data or None if error
         """
         try:
-            # Map timeframes to yfinance intervals
-            interval_map = {
-                '4h': '1h',  # yfinance doesn't have 4h, we'll use 1h and resample
-                '1d': '1d',
-                '1w': '1wk'
-            }
-
-            interval = interval_map.get(timeframe, '1d')
+            # Finnhub free tier limitation: no intraday data (4h not supported)
+            if timeframe == '4h':
+                print(f"Warning: 4h timeframe not supported with Finnhub free tier. Skipping {ticker}.")
+                return None
 
             # Adjust period based on timeframe
-            if timeframe == '4h':
-                period = '60d'  # Max for hourly data
-            elif timeframe == '1d':
+            if timeframe == '1d':
                 period = '6mo'  # 6 months for daily
             elif timeframe == '1w':
                 period = '2y'   # 2 years for weekly
+            else:
+                period = '6mo'  # Default
 
-            df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
+            # Fetch data using Finnhub
+            df = self.data_fetcher.fetch_historical_data(ticker, period=period)
 
-            if df.empty:
+            if df is None or len(df) == 0:
                 return None
 
-            # Handle MultiIndex columns (newer yfinance versions)
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            # Rename columns to lowercase
-            df.columns = [col.lower() for col in df.columns]
-
-            # Resample for 4h timeframe
-            if timeframe == '4h' and interval == '1h':
-                df = df.resample('4h').agg({
-                    'open': 'first',
-                    'high': 'max',
-                    'low': 'min',
-                    'close': 'last',
-                    'volume': 'sum'
-                }).dropna()
+            # Resample for weekly timeframe if needed
+            if timeframe == '1w':
+                df = self.data_fetcher.resample_to_weekly(df)
 
             return df
 

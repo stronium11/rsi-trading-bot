@@ -4,12 +4,12 @@ Simulates actual trades with multi-leg position management
 """
 
 import pandas as pd
-import yfinance as yf
 from datetime import datetime, timedelta
 import numpy as np
 import gc
 import time
 import os
+from data_fetcher import get_data_fetcher
 
 
 class Trade:
@@ -239,6 +239,7 @@ class BacktestEngine:
         self.signals_csv = signals_csv
         self.signals_df = None
         self.trades = []
+        self.data_fetcher = get_data_fetcher()
 
     def load_signals(self):
         """Load signals from CSV"""
@@ -249,7 +250,7 @@ class BacktestEngine:
 
     def fetch_price_data(self, ticker, start_date, end_date):
         """
-        Fetch daily price data for backtesting
+        Fetch daily price data for backtesting using Finnhub
 
         Parameters:
         - ticker: Stock ticker
@@ -260,16 +261,15 @@ class BacktestEngine:
         - DataFrame with price data
         """
         try:
-            df = yf.download(ticker, start=start_date, end=end_date, interval='1d', progress=False, auto_adjust=True)
+            df = self.data_fetcher.fetch_historical_data(
+                ticker,
+                start_date=start_date,
+                end_date=end_date
+            )
 
-            if df.empty:
+            if df is None or len(df) == 0:
                 return None
 
-            # Handle MultiIndex columns
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            df.columns = [col.lower() for col in df.columns]
             return df
 
         except Exception as e:
