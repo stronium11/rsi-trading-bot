@@ -250,7 +250,7 @@ class BacktestEngine:
 
     def fetch_price_data(self, ticker, start_date, end_date):
         """
-        Fetch daily price data for backtesting using Finnhub
+        Fetch daily price data for backtesting using Twelve Data
 
         Parameters:
         - ticker: Stock ticker
@@ -264,7 +264,8 @@ class BacktestEngine:
             df = self.data_fetcher.fetch_historical_data(
                 ticker,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
+                interval='1day'
             )
 
             if df is None or len(df) == 0:

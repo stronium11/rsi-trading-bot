@@ -30,12 +30,12 @@ class BacktestScanner:
         combined = list(set(nasdaq_tickers + sp500_tickers))
         self.tickers = sorted(combined)
 
-        # Initialize Finnhub data fetcher
+        # Initialize Twelve Data fetcher
         self.data_fetcher = get_data_fetcher()
 
     def fetch_historical_data(self, ticker, timeframe):
         """
-        Fetch 5 years of historical data using Finnhub
+        Fetch 5 years of historical data using Twelve Data
 
         Parameters:
         - ticker: Stock ticker symbol
@@ -45,8 +45,8 @@ class BacktestScanner:
         - DataFrame with historical data or None if error
         """
         try:
-            # Fetch 5 years of daily data from Finnhub
-            df = self.data_fetcher.fetch_historical_data(ticker, period='5y')
+            # Fetch 5 years of daily data from Twelve Data
+            df = self.data_fetcher.fetch_historical_data(ticker, period='5y', interval='1day')
 
             if df is None or len(df) == 0:
                 return None

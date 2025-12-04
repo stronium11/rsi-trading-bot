@@ -34,47 +34,47 @@ class MarketScanner:
         combined = list(set(nasdaq_tickers + sp500_tickers))
         self.tickers = sorted(combined)  # Sort alphabetically for consistent order
 
-        # Initialize Finnhub data fetcher
+        # Initialize Twelve Data fetcher
         self.data_fetcher = get_data_fetcher()
 
     def fetch_data(self, ticker, timeframe, period='3mo'):
         """
-        Fetch market data for a ticker and timeframe using Finnhub
-
-        NOTE: Finnhub free tier only supports daily data (no intraday/hourly).
-        4h timeframe is not supported with Finnhub free tier.
+        Fetch market data for a ticker and timeframe using Twelve Data
 
         Parameters:
         - ticker: Stock ticker symbol
-        - timeframe: Timeframe interval (1d or 1w supported)
+        - timeframe: Timeframe interval (4h, 1d, or 1w)
         - period: Data period to fetch
 
         Returns:
         - DataFrame with market data or None if error
         """
         try:
-            # Finnhub free tier limitation: no intraday data (4h not supported)
-            if timeframe == '4h':
-                print(f"Warning: 4h timeframe not supported with Finnhub free tier. Skipping {ticker}.")
-                return None
+            # Map our timeframe names to Twelve Data interval format
+            interval_map = {
+                '4h': '4h',
+                '1h': '1h',
+                '1d': '1day',
+                '1w': '1week'
+            }
+
+            interval = interval_map.get(timeframe, '1day')
 
             # Adjust period based on timeframe
-            if timeframe == '1d':
+            if timeframe == '4h' or timeframe == '1h':
+                period = '3mo'  # 3 months for intraday
+            elif timeframe == '1d':
                 period = '6mo'  # 6 months for daily
             elif timeframe == '1w':
                 period = '2y'   # 2 years for weekly
             else:
                 period = '6mo'  # Default
 
-            # Fetch data using Finnhub
-            df = self.data_fetcher.fetch_historical_data(ticker, period=period)
+            # Fetch data using Twelve Data
+            df = self.data_fetcher.fetch_historical_data(ticker, period=period, interval=interval)
 
             if df is None or len(df) == 0:
                 return None
-
-            # Resample for weekly timeframe if needed
-            if timeframe == '1w':
-                df = self.data_fetcher.resample_to_weekly(df)
 
             return df
 
