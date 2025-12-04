@@ -22,7 +22,7 @@ class BacktestScanner:
         """
         Initialize the backtest scanner
         """
-        self.timeframes = ['1d', '3d']  # Only 1d and 3d timeframes for backtesting
+        self.timeframes = ['1d', '3d', '1w']  # 1d, 3d, and weekly timeframes for backtesting
 
         # Combine Nasdaq 100 and S&P 500 tickers, remove duplicates
         nasdaq_tickers = get_nasdaq100_tickers()
@@ -51,9 +51,11 @@ class BacktestScanner:
             if df is None or len(df) == 0:
                 return None
 
-            # Resample for 3d timeframe if needed
+            # Resample for 3d or 1w timeframe if needed
             if timeframe == '3d':
                 df = self.data_fetcher.resample_to_3d(df)
+            elif timeframe == '1w':
+                df = self.data_fetcher.resample_to_weekly(df)
 
             return df
 
