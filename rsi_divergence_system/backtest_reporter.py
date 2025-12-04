@@ -120,6 +120,18 @@ class BacktestReporter:
 
         return self.analyzer.metrics['by_type']
 
+    def generate_timeframe_type_report(self):
+        """
+        Generate combined timeframe + type breakdown report
+
+        Returns:
+        - DataFrame with metrics by timeframe and type
+        """
+        if not self.analyzer.metrics:
+            self.analyzer.run_full_analysis()
+
+        return self.analyzer.metrics['by_timeframe_and_type']
+
     def generate_quarterly_report(self):
         """
         Generate quarterly performance report
@@ -234,7 +246,15 @@ class BacktestReporter:
         reports['type'] = type_report
         print(f"  Saved: {type_path}")
 
-        # 4. Quarterly Report
+        # 4. Timeframe + Type Combined Report
+        print("Generating timeframe + type breakdown...")
+        timeframe_type = self.generate_timeframe_type_report()
+        timeframe_type_path = os.path.join(self.output_dir, 'timeframe_type_report.csv')
+        timeframe_type.to_csv(timeframe_type_path, index=False)
+        reports['timeframe_type'] = timeframe_type
+        print(f"  Saved: {timeframe_type_path}")
+
+        # 5. Quarterly Report
         print("Generating quarterly report...")
         quarterly = self.generate_quarterly_report()
         quarterly_path = os.path.join(self.output_dir, 'quarterly_report.csv')
@@ -242,7 +262,7 @@ class BacktestReporter:
         reports['quarterly'] = quarterly
         print(f"  Saved: {quarterly_path}")
 
-        # 5. Trade Details Report
+        # 6. Trade Details Report
         print("Generating trade details report...")
         trade_details = self.generate_trade_details_report()
         details_path = os.path.join(self.output_dir, 'trade_details_report.csv')
@@ -250,7 +270,7 @@ class BacktestReporter:
         reports['trade_details'] = trade_details
         print(f"  Saved: {details_path}")
 
-        # 6. Equity Curve
+        # 7. Equity Curve
         print("Generating equity curve...")
         equity_curve = self.generate_equity_curve()
         equity_path = os.path.join(self.output_dir, 'equity_curve.csv')
@@ -295,13 +315,19 @@ class BacktestReporter:
         print("=" * 70)
         print(reports['type'].to_string(index=False))
 
-        # 4. Quarterly Performance
+        # 4. Combined Timeframe + Type Breakdown
+        print(f"\n{'='*70}")
+        print("PERFORMANCE BY TIMEFRAME + DIVERGENCE TYPE")
+        print("=" * 70)
+        print(reports['timeframe_type'].to_string(index=False))
+
+        # 5. Quarterly Performance
         print(f"\n{'='*70}")
         print("QUARTERLY PERFORMANCE")
         print("=" * 70)
         print(reports['quarterly'].to_string(index=False))
 
-        # 5. Best and Worst Trades
+        # 6. Best and Worst Trades
         print(f"\n{'='*70}")
         print("BEST AND WORST TRADES")
         print("=" * 70)
@@ -315,7 +341,7 @@ class BacktestReporter:
         top_losers = trade_details.tail(10)[['ticker', 'timeframe', 'divergence_type', 'entry_date', 'total_pnl', 'total_pnl_pct', 'days_in_trade']]
         print(top_losers.to_string(index=False))
 
-        # 6. Equity Curve Summary
+        # 7. Equity Curve Summary
         print(f"\n{'='*70}")
         print("EQUITY CURVE SUMMARY")
         print("=" * 70)

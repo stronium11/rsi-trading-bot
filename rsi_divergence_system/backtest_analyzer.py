@@ -300,6 +300,48 @@ class BacktestAnalyzer:
         self.metrics['by_type'] = df_results
         return df_results
 
+    def analyze_by_timeframe_and_type(self):
+        """
+        Analyze performance by timeframe AND divergence type combined
+
+        Returns:
+        - DataFrame with metrics by timeframe and type
+        """
+        if self.df is None:
+            self.load_results()
+
+        # Get all unique combinations
+        combinations = self.df.groupby(['timeframe', 'divergence_type'])
+        results = []
+
+        for (timeframe, div_type), group_df in combinations:
+            total_trades = len(group_df)
+            winning_trades = len(group_df[group_df['total_pnl'] > 0])
+            losing_trades = len(group_df[group_df['total_pnl'] <= 0])
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+
+            total_pnl = group_df['total_pnl'].sum()
+            total_capital = group_df['initial_capital'].sum()
+            return_pct = (total_pnl / total_capital * 100) if total_capital > 0 else 0
+
+            results.append({
+                'timeframe': timeframe,
+                'divergence_type': div_type,
+                'total_trades': total_trades,
+                'winning_trades': winning_trades,
+                'losing_trades': losing_trades,
+                'win_rate': round(win_rate, 2),
+                'total_pnl': round(total_pnl, 2),
+                'avg_pnl': round(group_df['total_pnl'].mean(), 2),
+                'return_pct': round(return_pct, 2)
+            })
+
+        df_results = pd.DataFrame(results)
+        # Sort by timeframe first, then by divergence type
+        df_results = df_results.sort_values(['timeframe', 'divergence_type'])
+        self.metrics['by_timeframe_and_type'] = df_results
+        return df_results
+
     def analyze_by_quarter(self):
         """
         Analyze performance by quarter
@@ -371,6 +413,9 @@ class BacktestAnalyzer:
 
         print("Analyzing by divergence type...")
         self.analyze_by_type()
+
+        print("Analyzing by timeframe + type combined...")
+        self.analyze_by_timeframe_and_type()
 
         print("Analyzing by quarter...")
         self.analyze_by_quarter()
