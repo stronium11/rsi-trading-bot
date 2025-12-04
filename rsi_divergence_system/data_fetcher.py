@@ -28,9 +28,9 @@ class TwelveDataFetcher:
         self.api_key = api_key
         self.base_url = "https://api.twelvedata.com"
 
-        # Rate limiting: 3000 calls/day = ~2 calls/minute to be safe
-        # Use 30 seconds between calls to stay well under limit
-        self.rate_limit_delay = 0.5  # 0.5 second = 120 calls/minute (well under limit)
+        # Rate limiting: Upgraded plan allows 55 calls/minute
+        # 60 seconds / 55 calls = 1.09 seconds per call
+        self.rate_limit_delay = 1.1  # 1.1 seconds = ~55 calls/minute
 
     def fetch_historical_data(self, ticker, start_date=None, end_date=None, period='5y', interval='1day'):
         """
