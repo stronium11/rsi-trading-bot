@@ -65,8 +65,8 @@ class EntryPriceOptimizer:
 
         Returns dict of entry method name -> entry price
         """
-        signal_date = signal['signal_date']
-        entry_date = signal['entry_date']  # Next day after signal
+        signal_date = pd.to_datetime(signal['signal_date'])
+        entry_date = pd.to_datetime(signal['entry_date'])  # Next day after signal
         divergence_type = signal['divergence_type']
 
         # Derive direction from divergence_type
@@ -172,6 +172,7 @@ class EntryPriceOptimizer:
         results = []
         skipped_no_cache = 0
         skipped_no_methods = 0
+        debug_first = True  # Debug first failure
 
         for idx, row in self.signals_df.iterrows():
             # Load cached price data
@@ -187,6 +188,16 @@ class EntryPriceOptimizer:
 
             if entry_methods is None or strategy_name not in entry_methods:
                 skipped_no_methods += 1
+                # Debug first failure
+                if debug_first:
+                    print(f"\n  DEBUG FIRST FAILURE:")
+                    print(f"    Ticker: {row['ticker']}")
+                    print(f"    Signal Date: {row['signal_date']} (type: {type(row['signal_date'])})")
+                    print(f"    Entry Date: {row['entry_date']}")
+                    print(f"    Price DF date range: {price_df.index.min()} to {price_df.index.max()}")
+                    print(f"    Price DF index type: {type(price_df.index)}")
+                    print(f"    Entry methods returned: {entry_methods}")
+                    debug_first = False
                 continue
 
             # Use the specific entry price for this strategy
