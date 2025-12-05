@@ -12,7 +12,7 @@ import pickle
 from datetime import datetime, timedelta
 from data_fetcher import get_data_fetcher
 import time
-from advanced_rule_optimizer import TradeSimulator
+from corrected_trade_simulator import CorrectedTradeSimulator
 
 
 class PriceDataCache:
@@ -200,7 +200,7 @@ class IterativeOptimizer:
                 'initial_shares': row['initial_shares']
             }
 
-            simulator = TradeSimulator(signal, price_df, rules)
+            simulator = CorrectedTradeSimulator(signal, price_df, rules)
             result = simulator.simulate()
             results.append(result)
 
