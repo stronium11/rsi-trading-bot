@@ -59,46 +59,59 @@ class EntryPriceOptimizer:
 
         print(f"Loaded {len(self.signals_df)} signals\n")
 
-    def ensure_signal_day_in_data(self, ticker, signal_date, price_df):
+    def ensure_signal_and_entry_days(self, ticker, signal_date, entry_date, price_df):
         """
-        Ensure signal day is in price data by fetching if needed
+        Ensure both signal day and entry day are in price data by fetching if needed
 
-        Returns updated price_df with signal day included
+        Returns updated price_df with both days included
         """
         if price_df is None:
             return None
 
-        # Check if signal_date is already in the data
-        if signal_date in price_df.index:
+        # Check what's missing
+        need_signal = signal_date not in price_df.index
+        need_entry = entry_date not in price_df.index
+
+        if not need_signal and not need_entry:
+            # Both already present
             return price_df
 
-        # Need to fetch signal day data
+        # Fetch missing days
         from data_fetcher import get_data_fetcher
         fetcher = get_data_fetcher()
 
         try:
-            # Fetch a small range around signal date to get that day
-            start = signal_date - timedelta(days=5)
-            end = signal_date + timedelta(days=5)
+            # Fetch a range that covers both signal and entry days
+            # Account for weekends/holidays by fetching wider range
+            start = signal_date - timedelta(days=7)
+            end = entry_date + timedelta(days=7)
 
-            signal_df = fetcher.fetch_historical_data(
+            extra_df = fetcher.fetch_historical_data(
                 ticker,
                 start_date=start,
                 end_date=end,
                 interval='1day'
             )
 
-            if signal_df is not None and signal_date in signal_df.index:
-                # Get just the signal day
-                signal_day = signal_df.loc[[signal_date]]
-                # Prepend to existing data
-                price_df = pd.concat([signal_day, price_df])
-                # Remove duplicates and sort
-                price_df = price_df[~price_df.index.duplicated(keep='first')]
-                price_df = price_df.sort_index()
+            if extra_df is not None:
+                # Keep only the days we need that are missing
+                days_to_add = []
+                if need_signal and signal_date in extra_df.index:
+                    days_to_add.append(signal_date)
+                if need_entry and entry_date in extra_df.index:
+                    days_to_add.append(entry_date)
+
+                if days_to_add:
+                    # Extract missing days
+                    missing_data = extra_df.loc[days_to_add]
+                    # Merge with existing data
+                    price_df = pd.concat([missing_data, price_df])
+                    # Remove duplicates and sort
+                    price_df = price_df[~price_df.index.duplicated(keep='first')]
+                    price_df = price_df.sort_index()
 
         except Exception as e:
-            print(f"    Warning: Could not fetch signal day for {ticker}: {e}")
+            print(f"    Warning: Could not fetch missing days for {ticker}: {e}")
 
         return price_df
 
@@ -226,8 +239,13 @@ class EntryPriceOptimizer:
                 skipped_no_cache += 1
                 continue
 
-            # Ensure signal day is in the data (may need to fetch)
-            price_df = self.ensure_signal_day_in_data(row['ticker'], row['signal_date'], price_df)
+            # Ensure both signal day and entry day are in the data (may need to fetch)
+            price_df = self.ensure_signal_and_entry_days(
+                row['ticker'],
+                row['signal_date'],
+                row['entry_date'],
+                price_df
+            )
 
             if price_df is None:
                 skipped_no_cache += 1
