@@ -57,7 +57,10 @@ class EntryPriceOptimizer:
         """
         signal_date = signal['signal_date']
         entry_date = signal['entry_date']  # Next day after signal
-        direction = signal['direction']
+        divergence_type = signal['divergence_type']
+
+        # Derive direction from divergence_type
+        direction = 'LONG' if divergence_type == 'Bullish' else 'SHORT'
 
         # Get signal day data
         signal_day = price_df[price_df.index == signal_date]
@@ -179,12 +182,15 @@ class EntryPriceOptimizer:
             initial_capital = min(1000, entry_price)
             initial_shares = initial_capital / entry_price
 
+            # Derive direction from divergence_type
+            direction = 'LONG' if row['divergence_type'] == 'Bullish' else 'SHORT'
+
             # Create signal with this entry method
             signal = {
                 'ticker': row['ticker'],
                 'entry_date': row['entry_date'],
                 'entry_price': entry_price,
-                'direction': row['direction'],
+                'direction': direction,
                 'initial_capital': initial_capital,
                 'initial_shares': initial_shares
             }
