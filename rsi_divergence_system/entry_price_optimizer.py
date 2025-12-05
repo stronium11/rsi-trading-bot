@@ -148,19 +148,29 @@ class EntryPriceOptimizer:
         # Derive direction from divergence_type
         direction = 'LONG' if divergence_type == 'Bullish' else 'SHORT'
 
-        # Get signal day data
+        # Get signal day data - use nearest trading day if exact date doesn't exist
         signal_day = price_df[price_df.index == signal_date]
         if len(signal_day) == 0:
-            return None
+            # Market was closed on signal_date (holiday/weekend)
+            # Find nearest trading day before signal_date
+            before_days = price_df[price_df.index <= signal_date]
+            if len(before_days) == 0:
+                return None
+            signal_day = before_days.tail(1)
 
         signal_close = signal_day.iloc[0]['close']
         signal_high = signal_day.iloc[0]['high']
         signal_low = signal_day.iloc[0]['low']
 
-        # Get entry day data (next day)
+        # Get entry day data (next trading day after signal)
         entry_day = price_df[price_df.index == entry_date]
         if len(entry_day) == 0:
-            return None
+            # Market was closed on entry_date
+            # Find first trading day after signal
+            after_signal = price_df[price_df.index > signal_date]
+            if len(after_signal) == 0:
+                return None
+            entry_day = after_signal.head(1)
 
         entry_open = entry_day.iloc[0]['open']
         entry_close = entry_day.iloc[0]['close']
