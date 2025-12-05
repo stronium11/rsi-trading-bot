@@ -152,22 +152,25 @@ class EntryPriceOptimizer:
         signal_day = price_df[price_df.index == signal_date]
         if len(signal_day) == 0:
             # Market was closed on signal_date (holiday/weekend)
-            # Find nearest trading day before signal_date
+            # Try to find nearest trading day before signal_date
             before_days = price_df[price_df.index <= signal_date]
-            if len(before_days) == 0:
-                return None
-            signal_day = before_days.tail(1)
+            if len(before_days) > 0:
+                signal_day = before_days.tail(1)
+            else:
+                # No data before signal, use first available trading day
+                signal_day = price_df.head(1)
 
         signal_close = signal_day.iloc[0]['close']
         signal_high = signal_day.iloc[0]['high']
         signal_low = signal_day.iloc[0]['low']
+        actual_signal_date = signal_day.index[0]  # Actual date used (may differ from signal_date)
 
         # Get entry day data (next trading day after signal)
         entry_day = price_df[price_df.index == entry_date]
         if len(entry_day) == 0:
             # Market was closed on entry_date
-            # Find first trading day after signal
-            after_signal = price_df[price_df.index > signal_date]
+            # Find first trading day after the actual signal day used
+            after_signal = price_df[price_df.index > actual_signal_date]
             if len(after_signal) == 0:
                 return None
             entry_day = after_signal.head(1)
@@ -177,8 +180,8 @@ class EntryPriceOptimizer:
         entry_high = entry_day.iloc[0]['high']
         entry_low = entry_day.iloc[0]['low']
 
-        # Get next 3 days for pullback strategy
-        next_3_days = price_df[price_df.index > signal_date].head(3)
+        # Get next 3 days for pullback strategy (after actual signal day used)
+        next_3_days = price_df[price_df.index > actual_signal_date].head(3)
 
         entry_methods = {}
 
