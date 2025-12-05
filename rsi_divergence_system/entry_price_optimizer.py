@@ -59,6 +59,49 @@ class EntryPriceOptimizer:
 
         print(f"Loaded {len(self.signals_df)} signals\n")
 
+    def ensure_signal_day_in_data(self, ticker, signal_date, price_df):
+        """
+        Ensure signal day is in price data by fetching if needed
+
+        Returns updated price_df with signal day included
+        """
+        if price_df is None:
+            return None
+
+        # Check if signal_date is already in the data
+        if signal_date in price_df.index:
+            return price_df
+
+        # Need to fetch signal day data
+        from data_fetcher import get_data_fetcher
+        fetcher = get_data_fetcher()
+
+        try:
+            # Fetch a small range around signal date to get that day
+            start = signal_date - timedelta(days=5)
+            end = signal_date + timedelta(days=5)
+
+            signal_df = fetcher.fetch_historical_data(
+                ticker,
+                start_date=start,
+                end_date=end,
+                interval='1day'
+            )
+
+            if signal_df is not None and signal_date in signal_df.index:
+                # Get just the signal day
+                signal_day = signal_df.loc[[signal_date]]
+                # Prepend to existing data
+                price_df = pd.concat([signal_day, price_df])
+                # Remove duplicates and sort
+                price_df = price_df[~price_df.index.duplicated(keep='first')]
+                price_df = price_df.sort_index()
+
+        except Exception as e:
+            print(f"    Warning: Could not fetch signal day for {ticker}: {e}")
+
+        return price_df
+
     def get_entry_price_methods(self, signal, price_df):
         """
         Calculate different entry prices for a given signal
@@ -175,11 +218,18 @@ class EntryPriceOptimizer:
         debug_first = True  # Debug first failure
 
         for idx, row in self.signals_df.iterrows():
-            # Load cached price data
+            # Load cached price data (cached by entry_date)
             price_df = self.cache.load(row['ticker'], row['entry_date'])
 
             if price_df is None:
                 # Skip if no price data
+                skipped_no_cache += 1
+                continue
+
+            # Ensure signal day is in the data (may need to fetch)
+            price_df = self.ensure_signal_day_in_data(row['ticker'], row['signal_date'], price_df)
+
+            if price_df is None:
                 skipped_no_cache += 1
                 continue
 
