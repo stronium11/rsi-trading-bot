@@ -317,10 +317,19 @@ class IterativeOptimizer:
         print("\n" + "="*70)
         print("PHASE 3: OPTIMIZING TARGET 2")
         print("="*70)
-        print("\nTesting T2 targets: 15%, 18%, 20%, 25%")
+
+        # FIX: Only test T2 values > T1
+        t1_value = best_rules_so_far.get('target1_pct', 10)
+        all_t2_tests = [15, 18, 20, 22, 25, 30]
+        target2_tests = [t for t in all_t2_tests if t > t1_value]
+
+        if not target2_tests:
+            # Fallback: if T1 is very high, test higher values
+            target2_tests = [t1_value + 5, t1_value + 10, t1_value + 15]
+
+        print(f"\nT1 is at +{t1_value}%, so testing T2 at: {', '.join([f'+{t}%' for t in target2_tests])}")
         print("Testing T2 sizing: 15%, 20%, 25%, 30%\n")
 
-        target2_tests = [15, 18, 20, 25]
         sizing2_tests = [15, 20, 25, 30]
         results = []
 
@@ -358,14 +367,24 @@ class IterativeOptimizer:
         print("\n" + "="*70)
         print("PHASE 4: FINAL TUNING (Trailing Stops & T3)")
         print("="*70)
-        print("\nTesting trailing stops: None, 10%, 15%")
-        print("Testing T3 targets: 30%, 35%, 50%\n")
+
+        # FIX: Only test T3 values > T2
+        t2_value = best_rules_so_far.get('target2_pct', 20)
+        all_t3_tests = [30, 35, 40, 50, 60]
+        t3_tests = [t for t in all_t3_tests if t > t2_value]
+
+        if not t3_tests:
+            # Fallback: if T2 is very high, test higher values
+            t3_tests = [t2_value + 10, t2_value + 20, t2_value + 30]
+
+        print(f"\nT2 is at +{t2_value}%, so testing T3 at: {', '.join([f'+{t}%' for t in t3_tests])}")
+        print("Testing trailing stops: None, 10%, 15%\n")
 
         results = []
 
         # Test trailing stops
         for trailing_pct in [None, 10, 15]:
-            for t3_pct in [30, 35, 50]:
+            for t3_pct in t3_tests:
                 rules = best_rules_so_far.copy()
                 rules['use_trailing_stop'] = trailing_pct is not None
                 if trailing_pct:
