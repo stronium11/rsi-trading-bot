@@ -1,0 +1,7 @@
+timeframe,divergence_type,total_trades,winning_trades,losing_trades,win_rate,total_pnl,avg_pnl,return_pct
+1d,Bearish,170,57,113,33.53,2319.93,13.65,1.31
+1d,Bullish,78,34,44,43.59,2837.27,36.38,3.64
+1w,Bearish,60,25,35,41.67,1409.84,23.5,2.35
+1w,Bullish,6,2,4,33.33,210.49,35.08,3.51
+3d,Bearish,97,41,56,42.27,2621.77,27.03,2.67
+3d,Bullish,23,7,16,30.43,180.16,7.83,0.78

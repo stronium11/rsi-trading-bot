@@ -1,0 +1,22 @@
+Metric,Value
+Total Trades,434.0
+Winning Trades,166.0
+Losing Trades,268.0
+Win Rate (%),38.25
+Avg Profit per Winner ($),106.82
+Avg Loss per Loser ($),-30.42
+Profit Factor,2.18
+Total Wins ($),17731.61
+Total Losses ($),8152.15
+Total P&L ($),9579.46
+Total Capital Deployed ($),443098.49
+Total Return (%),2.16
+Avg P&L per Trade ($),22.07
+Median P&L per Trade ($),0.0
+Max Drawdown ($),-1540.55
+Max Drawdown (%),-14.32
+Longest Drawdown (days),151.0
+Sharpe Ratio,0.63
+Avg Days in Trade,36.0
+Annualized Return (%),14.52
+Annualized Volatility (%),19.96
