@@ -40,3 +40,4 @@ data/*.csv
 # Keep directory structure
 !logs/.gitkeep
 !data/.gitkeep
+optimization_results.txt
