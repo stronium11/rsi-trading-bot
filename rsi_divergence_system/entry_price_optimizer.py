@@ -160,6 +160,8 @@ class EntryPriceOptimizer:
         Returns performance metrics
         """
         results = []
+        skipped_no_cache = 0
+        skipped_no_methods = 0
 
         for idx, row in self.signals_df.iterrows():
             # Load cached price data
@@ -167,12 +169,14 @@ class EntryPriceOptimizer:
 
             if price_df is None:
                 # Skip if no price data
+                skipped_no_cache += 1
                 continue
 
             # Get all entry methods for this signal
             entry_methods = self.get_entry_price_methods(row, price_df)
 
             if entry_methods is None or strategy_name not in entry_methods:
+                skipped_no_methods += 1
                 continue
 
             # Use the specific entry price for this strategy
@@ -204,6 +208,31 @@ class EntryPriceOptimizer:
             result['divergence_type'] = row['divergence_type']
 
             results.append(result)
+
+        # Debug output
+        print(f"  Debug: Processed {len(self.signals_df)} total signals")
+        print(f"  Debug: Skipped {skipped_no_cache} signals (no price cache)")
+        print(f"  Debug: Skipped {skipped_no_methods} signals (no entry methods)")
+        print(f"  Debug: Successfully collected {len(results)} trade results")
+
+        # Check for empty results
+        if len(results) == 0:
+            print(f"  ERROR: No results collected for strategy '{strategy_name}'")
+            print(f"  Possible causes:")
+            print(f"    - Price cache not found (check cache path)")
+            print(f"    - Entry methods returning None for all signals")
+            print(f"    - Strategy name mismatch in entry_methods dict")
+            return {
+                'strategy': strategy_name,
+                'total_pnl': 0,
+                'total_trades': 0,
+                'winners': 0,
+                'win_rate': 0,
+                'avg_winner': 0,
+                'avg_loser': 0,
+                'profit_factor': 0,
+                'avg_pnl_per_trade': 0
+            }
 
         # Calculate metrics
         results_df = pd.DataFrame(results)
