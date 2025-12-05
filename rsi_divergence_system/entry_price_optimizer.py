@@ -8,6 +8,7 @@ Uses optimized exit rules from iterative optimizer
 import pandas as pd
 import numpy as np
 import ast
+import os
 from datetime import datetime, timedelta
 from iterative_optimizer import PriceDataCache
 from corrected_trade_simulator import CorrectedTradeSimulator
@@ -19,11 +20,20 @@ class EntryPriceOptimizer:
     Tests different entry price strategies on actual backtest signals
     """
 
-    def __init__(self, signals_csv='backtest/backtest_signals.csv'):
+    def __init__(self, signals_csv=None):
         """Initialize optimizer"""
+        # Default to path relative to this script's location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        if signals_csv is None:
+            signals_csv = os.path.join(script_dir, 'backtest', 'backtest_signals.csv')
+
         self.signals_csv = signals_csv
         self.signals_df = None
-        self.cache = PriceDataCache()
+
+        # Initialize cache with correct path
+        cache_dir = os.path.join(script_dir, 'backtest', 'price_cache')
+        self.cache = PriceDataCache(cache_dir=cache_dir)
 
         # Optimized exit rules from iterative optimizer
         self.optimal_exit_rules = {
