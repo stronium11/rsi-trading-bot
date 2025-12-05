@@ -59,7 +59,7 @@ class EntryPriceOptimizer:
 
         print(f"Loaded {len(self.signals_df)} signals\n")
 
-    def ensure_signal_and_entry_days(self, ticker, signal_date, entry_date, price_df):
+    def ensure_signal_and_entry_days(self, ticker, signal_date, entry_date, price_df, debug=False):
         """
         Ensure both signal day and entry day are in price data by fetching if needed
 
@@ -71,6 +71,9 @@ class EntryPriceOptimizer:
         # Check what's missing
         need_signal = signal_date not in price_df.index
         need_entry = entry_date not in price_df.index
+
+        if debug and (need_signal or need_entry):
+            print(f"    Missing days - Signal: {need_signal}, Entry: {need_entry}")
 
         if not need_signal and not need_entry:
             # Both already present
@@ -86,6 +89,9 @@ class EntryPriceOptimizer:
             start = signal_date - timedelta(days=7)
             end = entry_date + timedelta(days=7)
 
+            if debug:
+                print(f"    Fetching {ticker} from {start.date()} to {end.date()}")
+
             extra_df = fetcher.fetch_historical_data(
                 ticker,
                 start_date=start,
@@ -94,12 +100,20 @@ class EntryPriceOptimizer:
             )
 
             if extra_df is not None:
+                if debug:
+                    print(f"    Fetched {len(extra_df)} days")
+                    print(f"    Signal {signal_date.date()} in extra_df: {signal_date in extra_df.index}")
+                    print(f"    Entry {entry_date.date()} in extra_df: {entry_date in extra_df.index}")
+
                 # Keep only the days we need that are missing
                 days_to_add = []
                 if need_signal and signal_date in extra_df.index:
                     days_to_add.append(signal_date)
                 if need_entry and entry_date in extra_df.index:
                     days_to_add.append(entry_date)
+
+                if debug:
+                    print(f"    Days to add: {len(days_to_add)}")
 
                 if days_to_add:
                     # Extract missing days
@@ -109,6 +123,12 @@ class EntryPriceOptimizer:
                     # Remove duplicates and sort
                     price_df = price_df[~price_df.index.duplicated(keep='first')]
                     price_df = price_df.sort_index()
+
+                    if debug:
+                        print(f"    Updated price_df range: {price_df.index.min()} to {price_df.index.max()}")
+            else:
+                if debug:
+                    print(f"    Fetch returned None")
 
         except Exception as e:
             print(f"    Warning: Could not fetch missing days for {ticker}: {e}")
@@ -244,7 +264,8 @@ class EntryPriceOptimizer:
                 row['ticker'],
                 row['signal_date'],
                 row['entry_date'],
-                price_df
+                price_df,
+                debug=debug_first
             )
 
             if price_df is None:
