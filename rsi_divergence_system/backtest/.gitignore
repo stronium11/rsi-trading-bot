@@ -6,3 +6,4 @@ test_reports/
 backtest_signals.csv
 backtest_results.csv
 reports/
+optimized_results/
