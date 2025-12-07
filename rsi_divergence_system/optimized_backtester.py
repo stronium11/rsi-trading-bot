@@ -34,7 +34,6 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime, timedelta
-from data_fetcher import get_data_fetcher
 import pickle
 import time
 
@@ -49,7 +48,6 @@ class OptimizedBacktester:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         self.signals_csv = os.path.join(script_dir, signals_csv)
         self.signals_df = None
-        self.data_fetcher = get_data_fetcher()
 
         # Results storage
         self.trades = []  # Detailed exit legs
