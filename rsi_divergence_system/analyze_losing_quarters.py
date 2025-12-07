@@ -17,6 +17,7 @@ df = pd.read_csv(summary_csv)
 
 # Parse dates and create quarter column
 df['entry_date'] = pd.to_datetime(df['entry_date'])
+df['final_exit_date'] = pd.to_datetime(df['final_exit_date'])
 df['quarter'] = df['entry_date'].dt.to_period('Q').astype(str)
 
 # Filter for losing quarters
