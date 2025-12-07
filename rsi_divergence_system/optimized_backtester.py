@@ -420,7 +420,7 @@ class OptimizedBacktester:
             # Simulate trade
             exits = self.simulate_trade(row, price_df)
 
-            if exits is None:
+            if exits is None or len(exits) == 0:
                 skipped += 1
                 continue
 
