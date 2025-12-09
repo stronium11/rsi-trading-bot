@@ -253,6 +253,14 @@ class AdaptiveFilterTester:
         """Scenario D: Reduce size after 6 consecutive stop losses"""
         self.test_reduce_size_after_n_losses(6)
 
+    def test_scenario_e_skip_after_10_losses(self):
+        """Scenario E: Skip after 10 consecutive stop losses"""
+        self.test_skip_after_n_losses(10)
+
+    def test_scenario_f_reduce_size_after_10_losses(self):
+        """Scenario F: Reduce size after 10 consecutive stop losses"""
+        self.test_reduce_size_after_n_losses(10)
+
     def _generate_scenario_report(self, results_df, scenario_name, scenario_description):
         """Generate report for skip scenario"""
 
@@ -421,7 +429,7 @@ class AdaptiveFilterTester:
     def run_all_scenarios(self):
         """Run all adaptive filter scenarios"""
         print("="*70)
-        print("ADAPTIVE FILTER TESTING - 3 & 6 Consecutive Losses")
+        print("ADAPTIVE FILTER TESTING - 10 Consecutive Losses")
         print("="*70)
         print()
         print("Testing adaptive filters that respond to consecutive stop losses")
@@ -432,10 +440,10 @@ class AdaptiveFilterTester:
         self.load_data()
 
         print("\n")
-        self.test_scenario_c_skip_after_6_losses()
+        self.test_scenario_e_skip_after_10_losses()
 
         print("\n")
-        self.test_scenario_d_reduce_size_after_6_losses()
+        self.test_scenario_f_reduce_size_after_10_losses()
 
         print("="*70)
         print("ADAPTIVE FILTER TESTING COMPLETE")
