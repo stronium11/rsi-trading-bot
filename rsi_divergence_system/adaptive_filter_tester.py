@@ -55,9 +55,14 @@ class AdaptiveFilterTester:
         print()
 
     def is_stop_loss(self, row):
-        """Check if trade was stopped out"""
-        # Check if "Stop Loss" is in exit reasons
-        return 'Stop Loss' in str(row['exit_reasons'])
+        """Check if trade was a LOSING stop loss"""
+        # Only count as stop loss if:
+        # 1. "Stop Loss" is in exit reasons
+        # 2. Trade was a net loser
+        has_stop_loss = 'Stop Loss' in str(row['exit_reasons'])
+        is_loser = row['total_pnl'] <= 0
+
+        return has_stop_loss and is_loser
 
     def test_scenario_a_skip_after_3_losses(self):
         """
