@@ -401,21 +401,41 @@ class OptimizedBacktester:
 
         print(f"Processing {len(self.signals_df)} signals...")
 
-        # Use price cache from previous runs
+        # Initialize price cache and data fetcher
         from iterative_optimizer import PriceDataCache
+        from data_fetcher import get_data_fetcher
+
         cache_dir = os.path.join(os.path.dirname(self.signals_csv), 'price_cache')
         cache = PriceDataCache(cache_dir=cache_dir)
+        data_fetcher = get_data_fetcher()
 
         processed = 0
         skipped = 0
 
         for idx, row in self.signals_df.iterrows():
-            # Load price data from cache
+            # Try to load from cache first
             price_df = cache.load(row['ticker'], row['entry_date'])
 
+            # If not in cache, fetch and cache it
             if price_df is None:
-                skipped += 1
-                continue
+                print(f"  Fetching data for {row['ticker']}...")
+                try:
+                    price_df = data_fetcher.fetch_historical_data(
+                        row['ticker'],
+                        period='5y',
+                        interval='1day'
+                    )
+
+                    if price_df is not None and len(price_df) > 0:
+                        # Cache for future use
+                        cache.save(row['ticker'], price_df)
+                    else:
+                        skipped += 1
+                        continue
+                except Exception as e:
+                    print(f"  Error fetching {row['ticker']}: {e}")
+                    skipped += 1
+                    continue
 
             # Simulate trade
             exits = self.simulate_trade(row, price_df)
@@ -464,6 +484,11 @@ class OptimizedBacktester:
         print("Calculating performance metrics...")
 
         df = pd.DataFrame(self.trade_summaries)
+
+        # Check if we have any trades
+        if len(df) == 0:
+            print("⚠️  No trades to analyze. All signals were skipped.")
+            return {}, [], [], [], []
 
         # Overall metrics
         total_trades = len(df)
@@ -632,6 +657,12 @@ class OptimizedBacktester:
         print("PERFORMANCE REPORT")
         print("="*70)
         print()
+
+        # Handle empty results
+        if not overall:
+            print("No trades executed. Cannot generate report.")
+            print("="*70)
+            return
 
         print("OVERALL PERFORMANCE")
         print("-"*70)
