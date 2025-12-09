@@ -93,24 +93,24 @@ class AdaptiveFilterTester:
 
         return has_stop_loss and is_loser
 
-    def test_scenario_a_skip_after_3_losses(self):
+    def test_skip_after_n_losses(self, n_losses):
         """
-        Scenario A: Skip divergence type after 3 consecutive stop losses
+        Generic: Skip divergence type after N consecutive stop losses
 
         Rules:
         - Track consecutive stop losses by type (Bullish/Bearish separately)
-        - After 3 consecutive stops of same type → skip that type
+        - After N consecutive stops of same type → skip that type
         - Reset at start of new quarter
         """
         print("="*70)
-        print("SCENARIO A: Skip After 3 Consecutive Stop Losses")
+        print(f"SCENARIO: Skip After {n_losses} Consecutive Stop Losses")
         print("="*70)
         print()
         print("Rules:")
         print("  - Track stop losses by divergence type (Bullish/Bearish separately)")
-        print("  - After 3 consecutive stops → skip that divergence type")
+        print(f"  - After {n_losses} consecutive stops → skip that divergence type")
         print("  - Reset at start of each new quarter")
-        print("  - Do NOT mix types (3 Bullish stops ≠ 2 Bullish + 1 Bearish)")
+        print(f"  - Do NOT mix types ({n_losses} Bullish stops ≠ {n_losses-1} Bullish + 1 Bearish)")
         print()
 
         # Track state
@@ -148,8 +148,8 @@ class AdaptiveFilterTester:
             if self.is_stop_loss(row):
                 consecutive_stops[div_type] += 1
 
-                # Check if we hit 3 consecutive stops
-                if consecutive_stops[div_type] >= 3:
+                # Check if we hit N consecutive stops
+                if consecutive_stops[div_type] >= n_losses:
                     blocked_types[div_type] = True
             else:
                 # Non-stop loss resets consecutive counter for this type
@@ -158,28 +158,32 @@ class AdaptiveFilterTester:
         # Generate report
         self._generate_scenario_report(
             results_df,
-            scenario_name="Scenario_A_Skip_After_3_Stops",
-            scenario_description="Skip divergence type after 3 consecutive stop losses"
+            scenario_name=f"Skip_After_{n_losses}_Stops",
+            scenario_description=f"Skip divergence type after {n_losses} consecutive stop losses"
         )
 
-    def test_scenario_b_reduce_size_after_3_losses(self):
+    def test_scenario_a_skip_after_3_losses(self):
+        """Scenario A: Skip after 3 consecutive stop losses"""
+        self.test_skip_after_n_losses(3)
+
+    def test_reduce_size_after_n_losses(self, n_losses):
         """
-        Scenario B: Reduce position size to 50% after 3 consecutive stop losses
+        Generic: Reduce position size to 50% after N consecutive stop losses
 
         Rules:
         - Track consecutive stop losses by type (Bullish/Bearish separately)
-        - After 3 consecutive stops → reduce position to 50% for that type
+        - After N consecutive stops → reduce position to 50% for that type
         - Reset at start of new quarter
         """
         print("="*70)
-        print("SCENARIO B: Reduce Position 50% After 3 Consecutive Stop Losses")
+        print(f"SCENARIO: Reduce Position 50% After {n_losses} Consecutive Stop Losses")
         print("="*70)
         print()
         print("Rules:")
         print("  - Track stop losses by divergence type (Bullish/Bearish separately)")
-        print("  - After 3 consecutive stops → reduce position to 50% ($500 instead of $1000)")
+        print(f"  - After {n_losses} consecutive stops → reduce position to 50% ($500 instead of $1000)")
         print("  - Reset at start of each new quarter")
-        print("  - Do NOT mix types (3 Bullish stops ≠ 2 Bullish + 1 Bearish)")
+        print(f"  - Do NOT mix types ({n_losses} Bullish stops ≠ {n_losses-1} Bullish + 1 Bearish)")
         print()
 
         # Track state
@@ -218,8 +222,8 @@ class AdaptiveFilterTester:
             if self.is_stop_loss(row):
                 consecutive_stops[div_type] += 1
 
-                # Check if we hit 3 consecutive stops
-                if consecutive_stops[div_type] >= 3:
+                # Check if we hit N consecutive stops
+                if consecutive_stops[div_type] >= n_losses:
                     reduced_size[div_type] = True
             else:
                 # Non-stop loss resets consecutive counter for this type
@@ -228,9 +232,21 @@ class AdaptiveFilterTester:
         # Generate report
         self._generate_position_sizing_report(
             results_df,
-            scenario_name="Scenario_B_Reduce_50pct_After_3_Stops",
-            scenario_description="Reduce position size to 50% after 3 consecutive stop losses"
+            scenario_name=f"Reduce_50pct_After_{n_losses}_Stops",
+            scenario_description=f"Reduce position size to 50% after {n_losses} consecutive stop losses"
         )
+
+    def test_scenario_b_reduce_size_after_3_losses(self):
+        """Scenario B: Reduce size after 3 consecutive stop losses"""
+        self.test_reduce_size_after_n_losses(3)
+
+    def test_scenario_c_skip_after_6_losses(self):
+        """Scenario C: Skip after 6 consecutive stop losses"""
+        self.test_skip_after_n_losses(6)
+
+    def test_scenario_d_reduce_size_after_6_losses(self):
+        """Scenario D: Reduce size after 6 consecutive stop losses"""
+        self.test_reduce_size_after_n_losses(6)
 
     def _generate_scenario_report(self, results_df, scenario_name, scenario_description):
         """Generate report for skip scenario"""
@@ -397,10 +413,10 @@ class AdaptiveFilterTester:
         print("="*70)
         print()
 
-    def run_both_scenarios(self):
-        """Run both adaptive filter scenarios"""
+    def run_all_scenarios(self):
+        """Run all adaptive filter scenarios"""
         print("="*70)
-        print("ADAPTIVE FILTER TESTING")
+        print("ADAPTIVE FILTER TESTING - 3 & 6 Consecutive Losses")
         print("="*70)
         print()
         print("Testing adaptive filters that respond to consecutive stop losses")
@@ -411,10 +427,10 @@ class AdaptiveFilterTester:
         self.load_data()
 
         print("\n")
-        self.test_scenario_a_skip_after_3_losses()
+        self.test_scenario_c_skip_after_6_losses()
 
         print("\n")
-        self.test_scenario_b_reduce_size_after_3_losses()
+        self.test_scenario_d_reduce_size_after_6_losses()
 
         print("="*70)
         print("ADAPTIVE FILTER TESTING COMPLETE")
@@ -425,7 +441,7 @@ class AdaptiveFilterTester:
 def main():
     """Run adaptive filter tests"""
     tester = AdaptiveFilterTester()
-    tester.run_both_scenarios()
+    tester.run_all_scenarios()
 
 
 if __name__ == "__main__":
