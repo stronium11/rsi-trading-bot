@@ -285,7 +285,7 @@ class OptimizedBacktester:
 
                         exits.append({
                             'exit_date': date,
-                            'exit_reason': 'Target 2 (+18%)',
+                            'exit_reason': f'Target 2 (+{self.rules["target2_pct"]}%)',
                             'exit_price': exit_price,
                             'shares_closed': shares_to_close,
                             'pct_of_position': self.rules['target2_size'],
@@ -310,7 +310,7 @@ class OptimizedBacktester:
 
                         exits.append({
                             'exit_date': date,
-                            'exit_reason': 'Target 2 (+18%)',
+                            'exit_reason': f'Target 2 (+{self.rules["target2_pct"]}%)',
                             'exit_price': exit_price,
                             'shares_closed': shares_to_close,
                             'pct_of_position': self.rules['target2_size'],
