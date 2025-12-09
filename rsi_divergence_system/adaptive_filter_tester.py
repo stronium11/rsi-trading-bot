@@ -21,7 +21,7 @@ class AdaptiveFilterTester:
     """
 
     def __init__(self, signals_csv='backtest/backtest_signals.csv',
-                 baseline_results='backtest/backtest_results.csv'):
+                 baseline_results='backtest/optimized_results/trades_summary.csv'):
         """Initialize tester"""
         script_dir = os.path.dirname(os.path.abspath(__file__))
         self.signals_csv = os.path.join(script_dir, signals_csv)
@@ -43,35 +43,40 @@ class AdaptiveFilterTester:
         self.baseline_df['entry_date'] = pd.to_datetime(self.baseline_df['entry_date'])
         self.baseline_df['signal_date'] = pd.to_datetime(self.baseline_df['signal_date'])
 
-        # Parse exits column to extract final_exit_date and exit_reasons
-        import ast
-        import re
+        # Check if we need to parse exits column or if exit_reasons/final_exit_date already exist
+        if 'exit_reasons' not in self.baseline_df.columns or 'final_exit_date' not in self.baseline_df.columns:
+            # Parse exits column to extract final_exit_date and exit_reasons
+            import ast
+            import re
 
-        def extract_exit_info(exits_str):
-            """Extract final exit date and exit reasons from exits string"""
-            try:
-                # Handle pandas objects in the string
-                exits_str = str(exits_str)
+            def extract_exit_info(exits_str):
+                """Extract final exit date and exit reasons from exits string"""
+                try:
+                    # Handle pandas objects in the string
+                    exits_str = str(exits_str)
 
-                # Extract all exit_date timestamps
-                date_matches = re.findall(r"'exit_date': Timestamp\('([^']+)'\)", exits_str)
-                # Extract all exit_reason strings
-                reason_matches = re.findall(r"'exit_reason': '([^']+)'", exits_str)
+                    # Extract all exit_date timestamps
+                    date_matches = re.findall(r"'exit_date': Timestamp\('([^']+)'\)", exits_str)
+                    # Extract all exit_reason strings
+                    reason_matches = re.findall(r"'exit_reason': '([^']+)'", exits_str)
 
-                if date_matches and reason_matches:
-                    # Get final exit date (last one)
-                    final_exit_date = pd.to_datetime(date_matches[-1])
-                    # Get all exit reasons
-                    exit_reasons = ', '.join(reason_matches)
-                    return final_exit_date, exit_reasons
-                else:
+                    if date_matches and reason_matches:
+                        # Get final exit date (last one)
+                        final_exit_date = pd.to_datetime(date_matches[-1])
+                        # Get all exit reasons
+                        exit_reasons = ', '.join(reason_matches)
+                        return final_exit_date, exit_reasons
+                    else:
+                        return pd.NaT, ''
+                except Exception as e:
                     return pd.NaT, ''
-            except Exception as e:
-                return pd.NaT, ''
 
-        self.baseline_df[['final_exit_date', 'exit_reasons']] = self.baseline_df['exits'].apply(
-            lambda x: pd.Series(extract_exit_info(x))
-        )
+            self.baseline_df[['final_exit_date', 'exit_reasons']] = self.baseline_df['exits'].apply(
+                lambda x: pd.Series(extract_exit_info(x))
+            )
+        else:
+            # Columns already exist, just parse dates
+            self.baseline_df['final_exit_date'] = pd.to_datetime(self.baseline_df['final_exit_date'])
 
         # Add quarter column
         self.baseline_df['quarter'] = self.baseline_df['entry_date'].dt.to_period('Q')
