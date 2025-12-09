@@ -60,7 +60,7 @@ class OptimizedBacktester:
             'initial_stop_pct': 7,  # -7%
             'target1_pct': 15,      # +15%
             'target1_size': 70,     # Close 70%
-            'target2_pct': 18,      # +18%
+            'target2_pct': 20,      # +20%
             'target2_size': 15,     # Close 15%
             'target3_pct': 50,      # +50%
             'breakeven_trigger_pct': 5,  # Move to +5% after T2
