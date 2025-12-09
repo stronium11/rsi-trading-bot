@@ -428,7 +428,7 @@ class OptimizedBacktester:
 
                     if price_df is not None and len(price_df) > 0:
                         # Cache for future use
-                        cache.save(row['ticker'], price_df)
+                        cache.save(row['ticker'], row['entry_date'], price_df)
                     else:
                         skipped += 1
                         continue
