@@ -48,7 +48,6 @@ reporter.generate_analytics()     # Analytics only
 - `signal_date` - When the signal was detected
 - `divergence_type` - Bullish or Bearish
 - `signal_close` - Price when signal was detected
-- `rsi_value` - RSI value at signal
 - `status` - pending, executed, skipped, or failed
 - `notes` - Additional information
 
@@ -68,11 +67,18 @@ reporter.generate_analytics()     # Analytics only
 - `initial_capital` - Total capital deployed
 - `total_pnl` - Total profit/loss in dollars
 - `total_pnl_pct` - Total return percentage
+- `tp1_status` - Was TP1 (+15%) reached? (Yes/No)
+- `tp1_value` - Exit price at TP1 (if reached)
+- `tp2_status` - Was TP2 (+18%) reached? (Yes/No)
+- `tp2_value` - Exit price at TP2 (if reached)
+- `tp3_status` - Was TP3 (+50%) reached? (Yes/No)
+- `tp3_value` - Exit price at TP3 (if reached)
+- `avg_pnl_per_exit` - Average P&L across all partial exits
 - `num_exits` - Number of partial exits (T1, T2, T3, stop)
 - `days_in_trade` - How long the position was held
 - `exits` - Detailed breakdown of all exits
 
-**Use Case:** Analyze all completed trades with full P&L details.
+**Use Case:** Analyze all completed trades with full P&L details and target achievement tracking.
 
 ### 3. Analytics Report
 
@@ -168,15 +174,15 @@ Once the bot starts trading, reports will look like this:
 
 ### Example Signals Report
 ```csv
-ticker,timeframe,signal_date,divergence_type,signal_close,rsi_value,status,notes
-AAPL,1d,2025-12-10 07:05:32,Bullish,185.50,28.45,executed,Detected on 2025-12-10
-TSLA,3d,2025-12-10 07:06:15,Bearish,285.20,72.18,pending,Detected on 2025-12-10
+ticker,timeframe,signal_date,divergence_type,signal_close,status,notes
+AAPL,1d,2025-12-10 07:05:32,Bullish,185.50,executed,Detected on 2025-12-10
+TSLA,3d,2025-12-10 07:06:15,Bearish,285.20,pending,Detected on 2025-12-10
 ```
 
 ### Example Trades Report
 ```csv
-ticker,timeframe,signal_date,entry_date,entry_price,divergence_type,direction,initial_shares,initial_capital,total_pnl,total_pnl_pct,num_exits,days_in_trade,exits
-AAPL,1d,2025-12-10,2025-12-11,186.00,Bullish,LONG,26.8817,5000.00,750.00,15.00,1,12,T1: +15% exit
+ticker,timeframe,signal_date,entry_date,entry_price,divergence_type,direction,initial_shares,initial_capital,total_pnl,total_pnl_pct,tp1_status,tp1_value,tp2_status,tp2_value,tp3_status,tp3_value,avg_pnl_per_exit,num_exits,days_in_trade,exits
+AAPL,1d,2025-12-10,2025-12-11,186.00,Bullish,LONG,26.8817,5000.00,750.00,15.00,Yes,213.90,No,,No,,750.00,1,12,T1: +15% exit
 ```
 
 ### Example Analytics Yearly P&L
