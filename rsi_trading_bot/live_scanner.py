@@ -15,7 +15,7 @@ from nasdaq100_tickers import get_nasdaq100_tickers
 from sp500_tickers import get_sp500_tickers
 from data_fetcher import get_data_fetcher
 from database import get_database
-from telegram_bot import get_telegram_bot
+from telegram_bot import get_bot
 from config import Config
 
 
@@ -37,7 +37,7 @@ class LiveScanner:
 
         self.data_fetcher = get_data_fetcher()
         self.db = get_database()
-        self.telegram = get_telegram_bot()
+        self.telegram = get_bot()
 
         # Filters
         self.min_price = 5.0          # Minimum price $5

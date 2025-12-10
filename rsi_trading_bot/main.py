@@ -11,7 +11,7 @@ from typing import Dict
 import pytz
 from config import Config
 from database import get_database
-from telegram_bot import get_telegram_bot
+from telegram_bot import get_bot
 from live_scanner import get_scanner
 from order_executor import get_order_executor
 from position_manager import get_position_manager
@@ -26,7 +26,7 @@ class TradingBot:
     def __init__(self):
         """Initialize the trading bot"""
         self.db = get_database()
-        self.telegram = get_telegram_bot()
+        self.telegram = get_bot()
         self.scanner = get_scanner()
         self.executor = get_order_executor()
         self.position_manager = get_position_manager()

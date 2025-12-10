@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from alpaca_client import get_alpaca_client
 from database import get_database
-from telegram_bot import get_telegram_bot
+from telegram_bot import get_bot
 from config import Config
 
 
@@ -21,7 +21,7 @@ class OrderExecutor:
         """Initialize the order executor"""
         self.alpaca = get_alpaca_client()
         self.db = get_database()
-        self.telegram = get_telegram_bot()
+        self.telegram = get_bot()
 
         # Trading configuration
         self.position_size = Config.POSITION_SIZE
