@@ -27,6 +27,11 @@ class TradingBot:
         """Initialize the trading bot"""
         self.db = get_database()
         self.telegram = get_bot()
+
+        # Initialize Telegram app for sending messages
+        from telegram.ext import Application
+        self.telegram.app = Application.builder().token(self.telegram.token).build()
+
         self.scanner = get_scanner()
         self.executor = get_order_executor()
         self.position_manager = get_position_manager()
