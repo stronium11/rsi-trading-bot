@@ -39,6 +39,7 @@ class Config:
     TARGET3_PCT = float(os.getenv('TARGET3_PCT', 50))
     TARGET3_SIZE = float(os.getenv('TARGET3_SIZE', 15))
     MAX_HOLD_DAYS = int(os.getenv('MAX_HOLD_DAYS', 120))
+    BREAKEVEN_TRIGGER_PCT = float(os.getenv('BREAKEVEN_TRIGGER_PCT', 5))
 
     # Market Hours (ET)
     MARKET_OPEN = "09:30"
