@@ -48,7 +48,6 @@ class TradingReporter:
                     s.detected_at as signal_date,
                     s.divergence_type,
                     s.entry_price as signal_close,
-                    s.rsi_value,
                     s.status,
                     s.notes
                 FROM signals s
@@ -60,14 +59,13 @@ class TradingReporter:
         with open(filepath, 'w', newline='') as f:
             writer = csv.writer(f)
 
-            # Header matching backtest format
+            # Header
             writer.writerow([
                 'ticker',
                 'timeframe',
                 'signal_date',
                 'divergence_type',
                 'signal_close',
-                'rsi_value',
                 'status',
                 'notes'
             ])
@@ -80,7 +78,6 @@ class TradingReporter:
                     signal['signal_date'],
                     signal['divergence_type'],
                     f"{signal['signal_close']:.2f}",
-                    f"{signal['rsi_value']:.2f}" if signal['rsi_value'] else '',
                     signal['status'],
                     signal['notes'] or ''
                 ])
@@ -124,7 +121,11 @@ class TradingReporter:
                     s.detected_at as signal_date,
                     s.divergence_type,
                     p.quantity as initial_quantity,
-                    p.entry_price as position_entry_price
+                    p.entry_price as position_entry_price,
+                    p.t1_executed,
+                    p.t1_price,
+                    p.t2_executed,
+                    p.t2_price
                 FROM trades t
                 LEFT JOIN signals s ON t.signal_id = s.id
                 LEFT JOIN positions p ON t.position_id = p.id
@@ -151,6 +152,28 @@ class TradingReporter:
             initial_capital = first_trade['position_entry_price'] * first_trade['initial_quantity']
             total_pnl_pct = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0
 
+            # Calculate average P&L per exit
+            avg_pnl_per_exit = total_pnl / len(trades) if len(trades) > 0 else 0
+
+            # Determine TP1 status and value
+            tp1_status = 'Yes' if first_trade['t1_executed'] else 'No'
+            tp1_value = first_trade['t1_price'] if first_trade['t1_executed'] else ''
+
+            # Determine TP2 status and value
+            tp2_status = 'Yes' if first_trade['t2_executed'] else 'No'
+            tp2_value = first_trade['t2_price'] if first_trade['t2_executed'] else ''
+
+            # Determine TP3 status and value
+            # T3 is typically the final exit with reason containing "target3" or "50%"
+            tp3_status = 'No'
+            tp3_value = ''
+            for trade in trades:
+                reason = (trade['exit_reason'] or '').lower()
+                if 'target3' in reason or 'target 3' in reason or '50%' in reason or 'remaining' in reason:
+                    tp3_status = 'Yes'
+                    tp3_value = trade['exit_price']
+                    break
+
             # Build exits list
             exits = []
             for trade in trades:
@@ -176,6 +199,13 @@ class TradingReporter:
                 'initial_capital': initial_capital,
                 'total_pnl': total_pnl,
                 'total_pnl_pct': total_pnl_pct,
+                'tp1_status': tp1_status,
+                'tp1_value': tp1_value,
+                'tp2_status': tp2_status,
+                'tp2_value': tp2_value,
+                'tp3_status': tp3_status,
+                'tp3_value': tp3_value,
+                'avg_pnl_per_exit': avg_pnl_per_exit,
                 'num_exits': len(trades),
                 'days_in_trade': max(t['hold_days'] for t in trades),
                 'exits': ' | '.join(exits)
@@ -185,7 +215,7 @@ class TradingReporter:
         with open(filepath, 'w', newline='') as f:
             writer = csv.writer(f)
 
-            # Header matching backtest format
+            # Header
             writer.writerow([
                 'ticker',
                 'timeframe',
@@ -198,6 +228,13 @@ class TradingReporter:
                 'initial_capital',
                 'total_pnl',
                 'total_pnl_pct',
+                'tp1_status',
+                'tp1_value',
+                'tp2_status',
+                'tp2_value',
+                'tp3_status',
+                'tp3_value',
+                'avg_pnl_per_exit',
                 'num_exits',
                 'days_in_trade',
                 'exits'
@@ -217,6 +254,13 @@ class TradingReporter:
                     f"{trade['initial_capital']:.2f}",
                     f"{trade['total_pnl']:.2f}",
                     f"{trade['total_pnl_pct']:.2f}",
+                    trade['tp1_status'],
+                    f"{trade['tp1_value']:.2f}" if trade['tp1_value'] else '',
+                    trade['tp2_status'],
+                    f"{trade['tp2_value']:.2f}" if trade['tp2_value'] else '',
+                    trade['tp3_status'],
+                    f"{trade['tp3_value']:.2f}" if trade['tp3_value'] else '',
+                    f"{trade['avg_pnl_per_exit']:.2f}",
                     trade['num_exits'],
                     trade['days_in_trade'],
                     trade['exits']
