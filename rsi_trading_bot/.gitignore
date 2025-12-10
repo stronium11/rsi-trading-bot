@@ -33,3 +33,7 @@ Thumbs.db
 # Trade data (sensitive)
 trades/
 positions/
+
+# Generated reports
+reports/
+*.csv
