@@ -7,7 +7,7 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, StopLossRequest, LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
 from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
+from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
 from alpaca.data.timeframe import TimeFrame
 from datetime import datetime, timedelta
 from config import Config
@@ -227,9 +227,37 @@ class AlpacaClient:
             logger.error(f"Error closing position {symbol}: {e}")
             return False
 
+    def get_latest_quote(self, symbols):
+        """
+        Get latest quote (real-time bid/ask) for symbols
+
+        Args:
+            symbols: List of ticker symbols
+
+        Returns:
+            Dict of {symbol: price}
+        """
+        try:
+            request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
+            quotes = self.data_client.get_stock_latest_quote(request)
+
+            result = {}
+            for symbol in symbols:
+                if symbol in quotes:
+                    quote = quotes[symbol]
+                    # Use mid-price (average of bid and ask)
+                    price = (float(quote.ask_price) + float(quote.bid_price)) / 2
+                    result[symbol] = {'close': price}
+
+            return result
+        except Exception as e:
+            logger.error(f"Error getting latest quotes: {e}")
+            return {}
+
     def get_latest_bars(self, symbols, timeframe='1Min'):
         """
         Get latest price bars for symbols
+        Falls back to quotes if bars unavailable
 
         Args:
             symbols: List of ticker symbols
@@ -261,7 +289,7 @@ class AlpacaClient:
 
             result = {}
             for symbol in symbols:
-                if symbol in bars:
+                if symbol in bars and len(bars[symbol]) > 0:
                     latest = bars[symbol][-1]  # Get most recent bar
                     result[symbol] = {
                         'open': float(latest.open),
@@ -272,11 +300,20 @@ class AlpacaClient:
                         'timestamp': latest.timestamp
                     }
 
+            # For symbols with no bar data, fall back to quotes
+            missing_symbols = [s for s in symbols if s not in result]
+            if missing_symbols:
+                logger.info(f"Falling back to quotes for: {missing_symbols}")
+                quotes = self.get_latest_quote(missing_symbols)
+                result.update(quotes)
+
             return result
 
         except Exception as e:
             logger.error(f"Error getting latest bars: {e}")
-            return {}
+            # Try quotes as complete fallback
+            logger.info("Attempting to fetch quotes as fallback")
+            return self.get_latest_quote(symbols)
 
     def is_market_open(self):
         """Check if market is currently open"""
