@@ -105,27 +105,25 @@ class OrderExecutor:
 
             print(f"\nExecuting {direction} order for {ticker}...")
 
-            # Get current price
-            bars = self.alpaca.get_latest_bars([ticker])
-            if not bars or ticker not in bars:
-                raise Exception(f"Could not get current price for {ticker}")
-
-            current_price = bars[ticker]['close']
-
-            # Calculate quantity (fractional shares allowed)
-            quantity = self.position_size / current_price
-
-            # Place market order
+            # Place market order (this also fetches current price internally)
             order = self.alpaca.place_market_order(
                 symbol=ticker,
                 direction=direction,
                 position_size=self.position_size
             )
 
+            if not order:
+                raise Exception(f"Could not get current price for {ticker}")
+
+            # Extract order details from response
+            order_id = order['order_id']
+            current_price = order['price']
+            quantity = order['qty']
+
             # Save order to database
             self.db.add_order(
                 signal_id=signal_id,
-                alpaca_order_id=order.id,
+                alpaca_order_id=order_id,
                 ticker=ticker,
                 order_type='market',
                 side='buy' if direction == 'LONG' else 'sell',
@@ -136,14 +134,14 @@ class OrderExecutor:
             # Wait for fill (poll for up to 10 seconds)
             import time
             for _ in range(10):
-                order_status = self.alpaca.get_order(order.id)
+                order_status = self.alpaca.get_order(order_id)
                 if order_status.status == 'filled':
                     filled_price = float(order_status.filled_avg_price)
                     filled_at = order_status.filled_at
 
                     # Update order status
                     self.db.update_order_status(
-                        alpaca_order_id=order.id,
+                        alpaca_order_id=order_id,
                         status='filled',
                         filled_price=filled_price,
                         filled_at=filled_at
@@ -153,17 +151,20 @@ class OrderExecutor:
                     stop_price = self.calculate_stop_loss(filled_price, direction)
 
                     # Place stop loss order
-                    stop_order = self.alpaca.place_stop_loss(
+                    stop_order = self.alpaca.place_stop_loss_order(
                         symbol=ticker,
-                        quantity=quantity,
+                        qty=quantity,
                         stop_price=stop_price,
                         direction=direction
                     )
 
+                    if not stop_order:
+                        raise Exception(f"Failed to place stop loss order")
+
                     # Save stop order
                     self.db.add_order(
                         signal_id=signal_id,
-                        alpaca_order_id=stop_order.id,
+                        alpaca_order_id=stop_order['order_id'],
                         ticker=ticker,
                         order_type='stop',
                         side='sell' if direction == 'LONG' else 'buy',
