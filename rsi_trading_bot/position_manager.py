@@ -142,73 +142,68 @@ class PositionManager:
                 position_size=exit_qty * current_price  # Use current value
             )
 
-            # Wait for fill
-            import time
-            for _ in range(10):
-                order_status = self.alpaca.get_order(order.id)
-                if order_status.status == 'filled':
-                    filled_price = float(order_status.filled_avg_price)
+            if not order:
+                raise Exception(f"Failed to place partial exit order for {ticker}")
 
-                    # Calculate P&L for this partial exit
-                    entry_price = position['entry_price']
-                    opened_at = position['opened_at']
-                    hold_days = (datetime.now() - datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')).days
+            order_id = order['order_id']
+            filled_price = order['price']  # Market orders fill immediately at current price
 
-                    pnl = self.calculate_pnl(entry_price, filled_price, exit_qty, direction)
+            # Calculate P&L for this partial exit
+            entry_price = position['entry_price']
+            opened_at = position['opened_at']
+            hold_days = (datetime.now() - datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')).days
 
-                    # Record the trade
-                    self.db.add_trade(
-                        position_id=position_id,
-                        signal_id=position['signal_id'],
-                        ticker=ticker,
-                        direction=direction,
-                        entry_price=entry_price,
-                        exit_price=filled_price,
-                        quantity=exit_qty,
-                        opened_at=opened_at,
-                        hold_days=hold_days,
-                        exit_reason=target_name.lower(),
-                        gross_pnl=pnl['gross_pnl'],
-                        net_pnl=pnl['net_pnl'],
-                        return_pct=pnl['return_pct']
-                    )
+            pnl = self.calculate_pnl(entry_price, filled_price, exit_qty, direction)
 
-                    # Update position remaining quantity
-                    new_remaining = remaining_qty - exit_qty
-                    self.db.update_position_quantity(position_id, new_remaining)
+            # Record the trade
+            self.db.add_trade(
+                position_id=position_id,
+                signal_id=position['signal_id'],
+                ticker=ticker,
+                direction=direction,
+                entry_price=entry_price,
+                exit_price=filled_price,
+                quantity=exit_qty,
+                opened_at=opened_at,
+                hold_days=hold_days,
+                exit_reason=target_name.lower(),
+                gross_pnl=pnl['gross_pnl'],
+                net_pnl=pnl['net_pnl'],
+                return_pct=pnl['return_pct']
+            )
 
-                    # Update target executed flag
-                    if target_name == 'T1':
-                        self.db.update_position_target(position_id, 1, filled_price)
-                    elif target_name == 'T2':
-                        self.db.update_position_target(position_id, 2, filled_price)
+            # Update position remaining quantity
+            new_remaining = remaining_qty - exit_qty
+            self.db.update_position_quantity(position_id, new_remaining)
 
-                    # Send notification
-                    await self.telegram.send_order_alert(
-                        ticker=ticker,
-                        direction='SELL' if direction == 'LONG' else 'BUY',
-                        shares=exit_qty,
-                        price=filled_price,
-                        order_type=f'{target_name} EXIT'
-                    )
+            # Update target executed flag
+            if target_name == 'T1':
+                self.db.update_position_target(position_id, 1, filled_price)
+            elif target_name == 'T2':
+                self.db.update_position_target(position_id, 2, filled_price)
 
-                    profit_emoji = "💰" if pnl['net_pnl'] > 0 else "📉"
-                    await self.telegram.send_message(
-                        f"{profit_emoji} *{target_name} Exit Complete*\n\n"
-                        f"Ticker: {ticker}\n"
-                        f"P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)\n"
-                        f"Remaining: {new_remaining:.4f} shares",
-                        parse_mode='Markdown'
-                    )
+            # Send notification
+            await self.telegram.send_order_alert(
+                ticker=ticker,
+                direction='SELL' if direction == 'LONG' else 'BUY',
+                shares=exit_qty,
+                price=filled_price,
+                order_type=f'{target_name} EXIT'
+            )
 
-                    print(f"✅ Partial exit filled @ ${filled_price:.2f}")
-                    print(f"   P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)")
+            profit_emoji = "💰" if pnl['net_pnl'] > 0 else "📉"
+            await self.telegram.send_message(
+                f"{profit_emoji} *{target_name} Exit Complete*\n\n"
+                f"Ticker: {ticker}\n"
+                f"P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)\n"
+                f"Remaining: {new_remaining:.4f} shares",
+                parse_mode='Markdown'
+            )
 
-                    return True
+            print(f"✅ Partial exit filled @ ${filled_price:.2f}")
+            print(f"   P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)")
 
-                time.sleep(1)
-
-            raise Exception("Partial exit order not filled within timeout")
+            return True
 
         except Exception as e:
             error_msg = f"Error executing partial exit for {ticker}: {str(e)}"
@@ -240,61 +235,56 @@ class PositionManager:
                 position_size=remaining_qty * current_price
             )
 
-            # Wait for fill
-            import time
-            for _ in range(10):
-                order_status = self.alpaca.get_order(order.id)
-                if order_status.status == 'filled':
-                    filled_price = float(order_status.filled_avg_price)
+            if not order:
+                raise Exception(f"Failed to place close position order for {ticker}")
 
-                    # Calculate P&L
-                    entry_price = position['entry_price']
-                    opened_at = position['opened_at']
-                    hold_days = (datetime.now() - datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')).days
+            order_id = order['order_id']
+            filled_price = order['price']  # Market orders fill immediately at current price
 
-                    pnl = self.calculate_pnl(entry_price, filled_price, remaining_qty, direction)
+            # Calculate P&L
+            entry_price = position['entry_price']
+            opened_at = position['opened_at']
+            hold_days = (datetime.now() - datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')).days
 
-                    # Record the trade
-                    self.db.add_trade(
-                        position_id=position_id,
-                        signal_id=position['signal_id'],
-                        ticker=ticker,
-                        direction=direction,
-                        entry_price=entry_price,
-                        exit_price=filled_price,
-                        quantity=remaining_qty,
-                        opened_at=opened_at,
-                        hold_days=hold_days,
-                        exit_reason=reason,
-                        gross_pnl=pnl['gross_pnl'],
-                        net_pnl=pnl['net_pnl'],
-                        return_pct=pnl['return_pct']
-                    )
+            pnl = self.calculate_pnl(entry_price, filled_price, remaining_qty, direction)
 
-                    # Close position
-                    self.db.update_position_quantity(position_id, 0)
-                    self.db.close_position(position_id)
+            # Record the trade
+            self.db.add_trade(
+                position_id=position_id,
+                signal_id=position['signal_id'],
+                ticker=ticker,
+                direction=direction,
+                entry_price=entry_price,
+                exit_price=filled_price,
+                quantity=remaining_qty,
+                opened_at=opened_at,
+                hold_days=hold_days,
+                exit_reason=reason,
+                gross_pnl=pnl['gross_pnl'],
+                net_pnl=pnl['net_pnl'],
+                return_pct=pnl['return_pct']
+            )
 
-                    # Send notification
-                    emoji = "🛑" if reason == 'stop_loss' else "⏰"
-                    await self.telegram.send_message(
-                        f"{emoji} *Position Closed: {reason.replace('_', ' ').title()}*\n\n"
-                        f"Ticker: {ticker}\n"
-                        f"Entry: ${entry_price:.2f}\n"
-                        f"Exit: ${filled_price:.2f}\n"
-                        f"P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)\n"
-                        f"Hold: {hold_days} days",
-                        parse_mode='Markdown'
-                    )
+            # Close position
+            self.db.update_position_quantity(position_id, 0)
+            self.db.close_position(position_id)
 
-                    print(f"✅ Position closed @ ${filled_price:.2f}")
-                    print(f"   P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)")
+            # Send notification
+            emoji = "🛑" if reason == 'stop_loss' else "⏰"
+            await self.telegram.send_message(
+                f"{emoji} *Position Closed: {reason.replace('_', ' ').title()}*\n\n"
+                f"Ticker: {ticker}\n"
+                f"Entry: ${entry_price:.2f}\n"
+                f"Exit: ${filled_price:.2f}\n"
+                f"P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)\n"
+                f"Hold: {hold_days} days",
+                parse_mode='Markdown'
+            )
 
-                    return
+            print(f"✅ Position closed @ ${filled_price:.2f}")
+            print(f"   P&L: ${pnl['net_pnl']:,.2f} ({pnl['return_pct']:.2f}%)")
 
-                time.sleep(1)
-
-            raise Exception("Close position order not filled within timeout")
+            return
 
         except Exception as e:
             error_msg = f"Error closing position for {ticker}: {str(e)}"
@@ -317,13 +307,13 @@ class PositionManager:
             t2_executed = position['t2_executed']
             opened_at = position['opened_at']
 
-            # Get current price
-            bars = self.alpaca.get_latest_bars([ticker])
-            if not bars or ticker not in bars:
-                print(f"Could not get price for {ticker}")
+            # Get current price from Alpaca position (more reliable than bars)
+            alpaca_position = self.alpaca.get_position(ticker)
+            if not alpaca_position:
+                print(f"Could not get position for {ticker} from Alpaca")
                 return
 
-            current_price = bars[ticker]['close']
+            current_price = alpaca_position['current_price']
 
             # Check max hold period
             days_held = (datetime.now() - datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')).days
