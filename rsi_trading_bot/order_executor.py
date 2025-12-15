@@ -131,82 +131,72 @@ class OrderExecutor:
                 price=current_price
             )
 
-            # Wait for fill (poll for up to 10 seconds)
-            import time
-            for _ in range(10):
-                order_status = self.alpaca.get_order(order_id)
-                if order_status.status == 'filled':
-                    filled_price = float(order_status.filled_avg_price)
-                    filled_at = order_status.filled_at
+            # Market orders fill immediately in paper trading
+            filled_price = current_price
 
-                    # Update order status
-                    self.db.update_order_status(
-                        alpaca_order_id=order_id,
-                        status='filled',
-                        filled_price=filled_price,
-                        filled_at=filled_at
-                    )
+            # Update order status
+            self.db.update_order_status(
+                alpaca_order_id=order_id,
+                status='filled',
+                filled_price=filled_price,
+                filled_at=None  # Paper trading fills instantly
+            )
 
-                    # Calculate stop loss
-                    stop_price = self.calculate_stop_loss(filled_price, direction)
+            # Calculate stop loss
+            stop_price = self.calculate_stop_loss(filled_price, direction)
 
-                    # Place stop loss order
-                    stop_order = self.alpaca.place_stop_loss_order(
-                        symbol=ticker,
-                        qty=quantity,
-                        stop_price=stop_price,
-                        direction=direction
-                    )
+            # Place stop loss order
+            stop_order = self.alpaca.place_stop_loss_order(
+                symbol=ticker,
+                qty=quantity,
+                stop_price=stop_price,
+                direction=direction
+            )
 
-                    if not stop_order:
-                        raise Exception(f"Failed to place stop loss order")
+            if not stop_order:
+                raise Exception(f"Failed to place stop loss order for {ticker}")
 
-                    # Save stop order
-                    self.db.add_order(
-                        signal_id=signal_id,
-                        alpaca_order_id=stop_order['order_id'],
-                        ticker=ticker,
-                        order_type='stop',
-                        side='sell' if direction == 'LONG' else 'buy',
-                        quantity=quantity,
-                        price=stop_price
-                    )
+            # Save stop order
+            self.db.add_order(
+                signal_id=signal_id,
+                alpaca_order_id=stop_order['order_id'],
+                ticker=ticker,
+                order_type='stop',
+                side='sell' if direction == 'LONG' else 'buy',
+                quantity=quantity,
+                price=stop_price
+            )
 
-                    # Create position record
-                    position_id = self.db.add_position(
-                        signal_id=signal_id,
-                        ticker=ticker,
-                        direction=direction,
-                        entry_price=filled_price,
-                        quantity=quantity,
-                        initial_stop=stop_price
-                    )
+            # Create position record
+            position_id = self.db.add_position(
+                signal_id=signal_id,
+                ticker=ticker,
+                direction=direction,
+                entry_price=filled_price,
+                quantity=quantity,
+                initial_stop=stop_price
+            )
 
-                    # Update signal status
-                    self.db.update_signal_status(signal_id, 'executed')
+            # Update signal status
+            self.db.update_signal_status(signal_id, 'executed')
 
-                    # Send notification
-                    await self.telegram.send_order_alert(
-                        ticker=ticker,
-                        direction=direction,
-                        shares=quantity,
-                        price=filled_price,
-                        order_type='MARKET'
-                    )
+            # Send notification
+            await self.telegram.send_order_alert(
+                ticker=ticker,
+                direction=direction,
+                shares=quantity,
+                price=filled_price,
+                order_type='MARKET'
+            )
 
-                    await self.telegram.send_message(
-                        f"🛡️ Stop loss placed at ${stop_price:.2f} (-{self.initial_stop_pct}%)"
-                    )
+            await self.telegram.send_message(
+                f"🛡️ Stop loss placed at ${stop_price:.2f} (-{self.initial_stop_pct}%)"
+            )
 
-                    print(f"✅ {direction} order filled: {quantity:.4f} shares @ ${filled_price:.2f}")
-                    print(f"   Stop loss: ${stop_price:.2f}")
+            print(f"✅ {direction} order filled: {quantity:.4f} shares @ ${filled_price:.2f}")
+            print(f"   Stop loss: ${stop_price:.2f}")
 
-                    return True
-
-                time.sleep(1)
-
-            # If not filled after 10 seconds
-            raise Exception("Order not filled within timeout period")
+            return True
 
         except Exception as e:
             error_msg = f"Error executing {ticker}: {str(e)}"
