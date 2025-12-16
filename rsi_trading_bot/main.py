@@ -55,15 +55,33 @@ class TradingBot:
         """Send startup notification"""
         stats = self.db.get_statistics()
 
+        # Get live positions from Alpaca for accurate count and P&L
+        try:
+            alpaca_positions = self.executor.alpaca.trading_client.get_all_positions()
+            long_positions = [p for p in alpaca_positions if p.side == 'long']
+            short_positions = [p for p in alpaca_positions if p.side == 'short']
+
+            total_pnl = sum(float(p.unrealized_pl) for p in alpaca_positions)
+
+            positions_breakdown = f"""
+• Total Positions: {len(alpaca_positions)}
+  - LONG: {len(long_positions)}
+  - SHORT: {len(short_positions)}
+• Current P&L: ${total_pnl:,.2f}"""
+        except Exception as e:
+            # Fallback to database if Alpaca fails
+            positions_breakdown = f"""
+• Open Positions: {stats['open_positions']} (from database)
+• Total P&L: ${stats['total_pnl']:,.2f} (from database)"""
+
         message = f"""
 🤖 *RSI Trading Bot Started*
 
 📊 *Current Status:*
-• Open Positions: {stats['open_positions']}
+{positions_breakdown}
 • Total Signals: {stats['total_signals']}
 • Total Trades: {stats['total_trades']}
 • Win Rate: {stats['win_rate']:.1f}%
-• Total P&L: ${stats['total_pnl']:,.2f}
 
 ⏰ *Schedule:*
 • Daily Scan: 7:00 AM ET
