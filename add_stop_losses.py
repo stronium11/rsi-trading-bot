@@ -84,11 +84,11 @@ def add_stop_loss_protection():
 
         if side == 'long':
             # LONG: stop below entry
-            stop_price = entry_price * (1 - stop_loss_pct)
+            stop_price = round(entry_price * (1 - stop_loss_pct), 2)
             stop_side = 'sell'
         else:
             # SHORT: stop above entry
-            stop_price = entry_price * (1 + stop_loss_pct)
+            stop_price = round(entry_price * (1 + stop_loss_pct), 2)
             stop_side = 'buy'
 
         print(f"  Calculated stop: ${stop_price:.2f} ({side.upper()} position, {-Config.STOP_LOSS_PCT}%)")
