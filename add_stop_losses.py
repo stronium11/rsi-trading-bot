@@ -28,7 +28,7 @@ def add_stop_loss_protection():
 
     # Get all open positions from Alpaca
     try:
-        positions = alpaca.api.list_positions()
+        positions = alpaca.trading_client.get_all_positions()
     except Exception as e:
         print(f"❌ Error fetching positions: {e}")
         return
@@ -42,7 +42,11 @@ def add_stop_loss_protection():
 
     # Get all open orders (to check for existing stop losses)
     try:
-        orders = alpaca.api.list_orders(status='open')
+        from alpaca.trading.requests import GetOrdersRequest
+        from alpaca.trading.enums import QueryOrderStatus
+
+        order_request = GetOrdersRequest(status=QueryOrderStatus.OPEN)
+        orders = alpaca.trading_client.get_orders(filter=order_request)
         stop_orders = {order.symbol: order for order in orders if order.type == 'stop'}
     except Exception as e:
         print(f"❌ Error fetching orders: {e}")
@@ -112,7 +116,7 @@ def add_stop_loss_protection():
                 print(f"  Found {len(conflicting_orders)} conflicting orders, canceling...")
                 for order in conflicting_orders:
                     try:
-                        alpaca.api.cancel_order_by_id(order.id)
+                        alpaca.trading_client.cancel_order_by_id(order.id)
                         print(f"    Canceled order {order.id}")
                     except Exception as e:
                         print(f"    Error canceling {order.id}: {e}")
