@@ -148,6 +148,16 @@ class TradingBot:
     async def run_telegram_bot(self):
         """Run Telegram bot to listen for commands"""
         try:
+            from telegram.ext import CommandHandler
+
+            # Register command handlers BEFORE starting polling
+            self.telegram.app.add_handler(CommandHandler("start", self.telegram.start_command))
+            self.telegram.app.add_handler(CommandHandler("status", self.telegram.status_command))
+            self.telegram.app.add_handler(CommandHandler("enable", self.telegram.enable_trading))
+            self.telegram.app.add_handler(CommandHandler("disable", self.telegram.disable_trading))
+            self.telegram.app.add_handler(CommandHandler("stop", self.telegram.emergency_stop))
+            self.telegram.app.add_handler(CommandHandler("csv", self.telegram.csv_command))
+
             # Initialize and start polling
             await self.telegram.app.initialize()
             await self.telegram.app.start()
