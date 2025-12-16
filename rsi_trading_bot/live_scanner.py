@@ -222,8 +222,17 @@ class LiveScanner:
         print(f"\nSaving {len(signals)} signals to database...")
 
         saved_count = 0
+        skipped_count = 0
         for signal in signals:
             try:
+                ticker = signal['ticker']
+
+                # Check for duplicates BEFORE adding
+                if self.db.has_active_signal_or_position(ticker):
+                    print(f"⚠️  Skipping {ticker} - already has pending signal or open position")
+                    skipped_count += 1
+                    continue
+
                 # Add signal to database
                 signal_id = self.db.add_signal(
                     ticker=signal['ticker'],
@@ -248,6 +257,8 @@ class LiveScanner:
                 print(f"Error saving signal {signal['ticker']}: {str(e)}")
 
         print(f"✅ Saved {saved_count}/{len(signals)} signals to database")
+        if skipped_count > 0:
+            print(f"⚠️  Skipped {skipped_count} duplicate signals")
 
         # Send summary notification
         summary = f"""

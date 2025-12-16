@@ -197,6 +197,38 @@ class TradingDatabase:
                     UPDATE signals SET status = ? WHERE id = ?
                 """, (status, signal_id))
 
+    def has_active_signal_or_position(self, ticker: str) -> bool:
+        """
+        Check if ticker already has a pending signal or open position
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            True if ticker should be skipped (has active signal/position), False if safe to add
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Check for pending signals
+            cursor.execute("""
+                SELECT COUNT(*) FROM signals
+                WHERE ticker = ? AND status = 'pending'
+            """, (ticker,))
+            pending_count = cursor.fetchone()[0]
+
+            if pending_count > 0:
+                return True
+
+            # Check for open positions
+            cursor.execute("""
+                SELECT COUNT(*) FROM positions
+                WHERE ticker = ? AND status = 'open'
+            """, (ticker,))
+            open_count = cursor.fetchone()[0]
+
+            return open_count > 0
+
     # ==================== ORDER METHODS ====================
 
     def add_order(self, signal_id: int, alpaca_order_id: str, ticker: str,
