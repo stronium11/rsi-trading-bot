@@ -127,12 +127,16 @@ def add_stop_loss_protection():
 
             order_side = OrderSide.SELL if stop_side == 'sell' else OrderSide.BUY
 
+            # Fractional shares require DAY orders, whole shares can use GTC
+            is_fractional = abs(qty) != int(abs(qty))
+            time_in_force = TimeInForce.DAY if is_fractional else TimeInForce.GTC
+
             stop_request = StopOrderRequest(
                 symbol=ticker,
                 qty=abs(qty),
                 side=order_side,
                 stop_price=stop_price,
-                time_in_force=TimeInForce.GTC  # Good til canceled
+                time_in_force=time_in_force
             )
 
             stop_order = alpaca.trading_client.submit_order(stop_request)
