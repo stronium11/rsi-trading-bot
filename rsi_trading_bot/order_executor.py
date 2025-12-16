@@ -87,7 +87,14 @@ class OrderExecutor:
 
     async def execute_signal(self, signal: Dict) -> bool:
         """
-        Execute a single signal
+        Execute a single signal with atomic transaction pattern
+
+        ATOMIC EXECUTION FLOW:
+        1. Place bracket order (entry + stop loss together)
+        2. Place T1 take profit order (70% of position @ +15%)
+        3. Place T2 take profit order (15% of position @ +18%)
+        4. If all Alpaca orders succeed: save to database
+        5. If any order fails: cancel all orders, mark signal failed
 
         Parameters:
         - signal: Signal dictionary from database
@@ -95,32 +102,86 @@ class OrderExecutor:
         Returns:
         - True if executed successfully, False otherwise
         """
-        try:
-            ticker = signal['ticker']
-            divergence_type = signal['divergence_type']
-            signal_id = signal['id']
+        alpaca_orders = []  # Track orders for potential rollback
+        ticker = signal['ticker']
+        divergence_type = signal['divergence_type']
+        signal_id = signal['id']
 
+        try:
             # Determine direction
             direction = 'LONG' if divergence_type == 'Bullish' else 'SHORT'
 
             print(f"\nExecuting {direction} order for {ticker}...")
 
-            # Place market order (this also fetches current price internally)
-            order = self.alpaca.place_market_order(
+            # STEP 1: Place bracket order (entry + stop loss together)
+            # This prevents wash trade errors on SHORT positions
+            bracket_order = self.alpaca.place_bracket_order_with_stop(
                 symbol=ticker,
                 direction=direction,
-                position_size=self.position_size
+                position_size=self.position_size,
+                stop_loss_pct=self.initial_stop_pct
             )
 
-            if not order:
-                raise Exception(f"Could not get current price for {ticker}")
+            if not bracket_order:
+                raise Exception(f"Failed to place bracket order for {ticker}")
 
-            # Extract order details from response
-            order_id = order['order_id']
-            current_price = order['price']
-            quantity = order['qty']
+            alpaca_orders.append(bracket_order['order_id'])
 
-            # Save order to database
+            # Extract order details
+            order_id = bracket_order['order_id']
+            filled_price = bracket_order['price']
+            quantity = bracket_order['qty']
+            stop_price = bracket_order['stop_price']
+
+            print(f"✅ Bracket order placed: {quantity:.4f} shares @ ${filled_price:.2f}")
+            print(f"   Stop loss: ${stop_price:.2f}")
+
+            # STEP 2: Calculate take profit targets
+            if direction == 'LONG':
+                # LONG: profit when price goes up
+                t1_price = round(filled_price * 1.15, 2)  # +15%
+                t2_price = round(filled_price * 1.18, 2)  # +18%
+            else:
+                # SHORT: profit when price goes down
+                t1_price = round(filled_price * 0.85, 2)  # -15%
+                t2_price = round(filled_price * 0.82, 2)  # -18%
+
+            # Calculate quantities for take profit orders
+            t1_qty = quantity * 0.70  # 70% of position
+            t2_qty = quantity * 0.15  # 15% of position
+            # Remaining 15% runs for T3 (+50%) - no order needed
+
+            # STEP 3: Place T1 take profit order
+            t1_order = self.alpaca.place_take_profit_order(
+                symbol=ticker,
+                direction=direction,
+                target_price=t1_price,
+                qty=t1_qty
+            )
+
+            if not t1_order:
+                raise Exception(f"Failed to place T1 take profit for {ticker}")
+
+            alpaca_orders.append(t1_order['order_id'])
+            print(f"✅ T1 take profit: ${t1_price:.2f} (70% of position)")
+
+            # STEP 4: Place T2 take profit order
+            t2_order = self.alpaca.place_take_profit_order(
+                symbol=ticker,
+                direction=direction,
+                target_price=t2_price,
+                qty=t2_qty
+            )
+
+            if not t2_order:
+                raise Exception(f"Failed to place T2 take profit for {ticker}")
+
+            alpaca_orders.append(t2_order['order_id'])
+            print(f"✅ T2 take profit: ${t2_price:.2f} (15% of position)")
+
+            # STEP 5: All Alpaca orders succeeded - now save to database atomically
+
+            # Save main market order
             self.db.add_order(
                 signal_id=signal_id,
                 alpaca_order_id=order_id,
@@ -128,43 +189,37 @@ class OrderExecutor:
                 order_type='market',
                 side='buy' if direction == 'LONG' else 'sell',
                 quantity=quantity,
-                price=current_price
+                price=filled_price
             )
 
-            # Market orders fill immediately in paper trading
-            filled_price = current_price
-
-            # Update order status
+            # Update to filled status (paper trading fills instantly)
             self.db.update_order_status(
                 alpaca_order_id=order_id,
                 status='filled',
                 filled_price=filled_price,
-                filled_at=None  # Paper trading fills instantly
+                filled_at=None
             )
 
-            # Calculate stop loss
-            stop_price = self.calculate_stop_loss(filled_price, direction)
-
-            # Place stop loss order
-            stop_order = self.alpaca.place_stop_loss_order(
-                symbol=ticker,
-                qty=quantity,
-                stop_price=stop_price,
-                direction=direction
-            )
-
-            if not stop_order:
-                raise Exception(f"Failed to place stop loss order for {ticker}")
-
-            # Save stop order
+            # Save T1 take profit order
             self.db.add_order(
                 signal_id=signal_id,
-                alpaca_order_id=stop_order['order_id'],
+                alpaca_order_id=t1_order['order_id'],
                 ticker=ticker,
-                order_type='stop',
+                order_type='limit',
                 side='sell' if direction == 'LONG' else 'buy',
-                quantity=quantity,
-                price=stop_price
+                quantity=t1_qty,
+                price=t1_price
+            )
+
+            # Save T2 take profit order
+            self.db.add_order(
+                signal_id=signal_id,
+                alpaca_order_id=t2_order['order_id'],
+                ticker=ticker,
+                order_type='limit',
+                side='sell' if direction == 'LONG' else 'buy',
+                quantity=t2_qty,
+                price=t2_price
             )
 
             # Create position record
@@ -180,27 +235,51 @@ class OrderExecutor:
             # Update signal status
             self.db.update_signal_status(signal_id, 'executed')
 
-            # Send notification
+            # STEP 6: Send notifications
             await self.telegram.send_order_alert(
                 ticker=ticker,
                 direction=direction,
                 shares=quantity,
                 price=filled_price,
-                order_type='MARKET'
+                order_type='BRACKET'
             )
 
-            await self.telegram.send_message(
-                f"🛡️ Stop loss placed at ${stop_price:.2f} (-{self.initial_stop_pct}%)"
-            )
+            # Format profit percentages based on direction
+            if direction == 'LONG':
+                profit_msg = (
+                    f"🛡️ Stop: ${stop_price:.2f} (-{self.initial_stop_pct}%)\n"
+                    f"🎯 T1: ${t1_price:.2f} (+15%, 70%)\n"
+                    f"🎯 T2: ${t2_price:.2f} (+18%, 15%)\n"
+                    f"🚀 T3: Running (15% for +50%)"
+                )
+            else:
+                profit_msg = (
+                    f"🛡️ Stop: ${stop_price:.2f} (+{self.initial_stop_pct}%)\n"
+                    f"🎯 T1: ${t1_price:.2f} (-15%, 70%)\n"
+                    f"🎯 T2: ${t2_price:.2f} (-18%, 15%)\n"
+                    f"🚀 T3: Running (15% for -50%)"
+                )
 
-            print(f"✅ {direction} order filled: {quantity:.4f} shares @ ${filled_price:.2f}")
-            print(f"   Stop loss: ${stop_price:.2f}")
+            await self.telegram.send_message(profit_msg)
+
+            print(f"✅ Position fully configured with stop loss and take profit orders")
+            print(f"   Remaining 15% will run for T3 target (+50%)")
 
             return True
 
         except Exception as e:
             error_msg = f"Error executing {ticker}: {str(e)}"
             print(f"❌ {error_msg}")
+
+            # ROLLBACK: Cancel all Alpaca orders that were placed
+            if alpaca_orders:
+                print(f"⚠️  Rolling back {len(alpaca_orders)} orders...")
+                for order_id in alpaca_orders:
+                    try:
+                        self.alpaca.cancel_order(order_id)
+                        print(f"  ✅ Cancelled order {order_id}")
+                    except Exception as cancel_error:
+                        print(f"  ⚠️  Could not cancel {order_id}: {cancel_error}")
 
             # Update signal as failed
             self.db.update_signal_status(signal_id, 'failed', notes=str(e))

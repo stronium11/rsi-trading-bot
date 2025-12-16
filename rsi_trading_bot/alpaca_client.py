@@ -153,6 +153,139 @@ class AlpacaClient:
             logger.error(f"Error placing market order for {symbol}: {e}")
             return None
 
+    def place_bracket_order_with_stop(self, symbol, direction, position_size, stop_loss_pct):
+        """
+        Place bracket order with entry + stop loss
+        This avoids wash trade errors by submitting them together
+
+        Args:
+            symbol: Stock ticker
+            direction: 'LONG' or 'SHORT'
+            position_size: Dollar amount to invest
+            stop_loss_pct: Stop loss percentage (e.g., 7 for 7%)
+
+        Returns:
+            Dict with order details or None
+        """
+        try:
+            # Get current price
+            current_price = None
+
+            bars = self.get_latest_bars([symbol])
+            if bars and symbol in bars and 'close' in bars[symbol]:
+                current_price = bars[symbol]['close']
+                logger.info(f"Got price for {symbol} from bars: ${current_price:.2f}")
+            else:
+                logger.warning(f"Bars failed for {symbol}, trying quotes directly...")
+                quotes = self.get_latest_quote([symbol])
+                if quotes and symbol in quotes and 'close' in quotes[symbol]:
+                    current_price = quotes[symbol]['close']
+                    logger.info(f"Got price for {symbol} from quotes: ${current_price:.2f}")
+
+            if not current_price:
+                logger.error(f"Cannot get price for {symbol} - both bars and quotes failed")
+                return None
+
+            # Calculate shares
+            shares = position_size / current_price
+
+            # Round to whole shares for SHORT orders (Alpaca requirement)
+            if direction == 'SHORT':
+                shares = int(shares)
+                logger.info(f"Rounded SHORT order to {shares} whole shares")
+
+            # Calculate stop price (rounded to 2 decimals)
+            if direction == 'LONG':
+                stop_price = round(current_price * (1 - stop_loss_pct/100), 2)
+            else:
+                stop_price = round(current_price * (1 + stop_loss_pct/100), 2)
+
+            # Determine side
+            side = OrderSide.BUY if direction == 'LONG' else OrderSide.SELL
+
+            # Fractional shares require DAY, whole shares can use GTC
+            is_fractional = shares != int(shares)
+            time_in_force = TimeInForce.DAY if is_fractional else TimeInForce.GTC
+
+            # Create bracket order with stop loss
+            bracket_order = MarketOrderRequest(
+                symbol=symbol,
+                qty=shares,
+                side=side,
+                time_in_force=time_in_force,
+                order_class=OrderClass.BRACKET,
+                stop_loss={'stop_price': stop_price}
+            )
+
+            order = self.trading_client.submit_order(bracket_order)
+
+            logger.info(f"Bracket order placed: {symbol} {direction} {shares:.4f} shares @ ${current_price:.2f}, stop @ ${stop_price:.2f}")
+
+            return {
+                'order_id': str(order.id),
+                'symbol': symbol,
+                'qty': shares,
+                'side': direction,
+                'price': current_price,
+                'stop_price': stop_price,
+                'status': order.status,
+                'legs': order.legs if hasattr(order, 'legs') else []
+            }
+
+        except Exception as e:
+            logger.error(f"Error placing bracket order for {symbol}: {e}")
+            return None
+
+    def place_take_profit_order(self, symbol, direction, target_price, qty):
+        """
+        Place take profit limit order
+
+        Args:
+            symbol: Stock ticker
+            direction: 'LONG' or 'SHORT'
+            target_price: Target profit price
+            qty: Number of shares
+
+        Returns:
+            Order object or None
+        """
+        try:
+            # For LONG, take profit is above entry (sell limit)
+            # For SHORT, take profit is below entry (buy limit)
+            side = OrderSide.SELL if direction == 'LONG' else OrderSide.BUY
+
+            # Fractional shares require DAY, whole shares can use GTC
+            is_fractional = abs(qty) != int(abs(qty))
+            time_in_force = TimeInForce.DAY if is_fractional else TimeInForce.GTC
+
+            # Round target price to 2 decimals
+            target_price = round(target_price, 2)
+
+            order_data = LimitOrderRequest(
+                symbol=symbol,
+                qty=abs(qty),
+                side=side,
+                time_in_force=time_in_force,
+                limit_price=target_price
+            )
+
+            order = self.trading_client.submit_order(order_data)
+
+            logger.info(f"Take profit order placed: {symbol} @ ${target_price:.2f} for {qty} shares")
+
+            return {
+                'order_id': str(order.id),
+                'symbol': symbol,
+                'type': 'take_profit',
+                'target_price': target_price,
+                'qty': abs(qty),
+                'status': order.status
+            }
+
+        except Exception as e:
+            logger.error(f"Error placing take profit for {symbol}: {e}")
+            return None
+
     def place_stop_loss_order(self, symbol, direction, stop_price, qty):
         """
         Place stop loss order
