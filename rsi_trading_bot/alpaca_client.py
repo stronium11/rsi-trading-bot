@@ -99,15 +99,31 @@ class AlpacaClient:
         """
         try:
             # Get current price to calculate shares
+            # Try bars first, then quotes directly as backup
+            current_price = None
+
             bars = self.get_latest_bars([symbol])
-            if not bars or symbol not in bars:
-                logger.error(f"Cannot get price for {symbol}")
+            if bars and symbol in bars and 'close' in bars[symbol]:
+                current_price = bars[symbol]['close']
+                logger.info(f"Got price for {symbol} from bars: ${current_price:.2f}")
+            else:
+                logger.warning(f"Bars failed for {symbol}, trying quotes directly...")
+                quotes = self.get_latest_quote([symbol])
+                if quotes and symbol in quotes and 'close' in quotes[symbol]:
+                    current_price = quotes[symbol]['close']
+                    logger.info(f"Got price for {symbol} from quotes: ${current_price:.2f}")
+
+            if not current_price:
+                logger.error(f"Cannot get price for {symbol} - both bars and quotes failed")
                 return None
 
-            current_price = bars[symbol]['close']
-
-            # Calculate shares (fractional allowed)
+            # Calculate shares
             shares = position_size / current_price
+
+            # Round to whole shares for SHORT orders (Alpaca requirement)
+            if direction == 'SHORT':
+                shares = int(shares)
+                logger.info(f"Rounded SHORT order to {shares} whole shares")
 
             # Determine side
             side = OrderSide.BUY if direction == 'LONG' else OrderSide.SELL
@@ -125,7 +141,7 @@ class AlpacaClient:
             logger.info(f"Market order placed: {symbol} {direction} {shares:.4f} shares @ ${current_price:.2f}")
 
             return {
-                'order_id': order.id,
+                'order_id': str(order.id),
                 'symbol': symbol,
                 'qty': shares,
                 'side': direction,
@@ -267,16 +283,9 @@ class AlpacaClient:
             Dict of {symbol: {open, high, low, close, volume}}
         """
         try:
-            # Map timeframe string to Alpaca TimeFrame
-            tf_map = {
-                '1Min': TimeFrame.Minute,
-                '5Min': TimeFrame.Minute * 5,
-                '15Min': TimeFrame.Minute * 15,
-                '1Hour': TimeFrame.Hour,
-                '1Day': TimeFrame.Day
-            }
-
-            tf = tf_map.get(timeframe, TimeFrame.Minute)
+            # Use TimeFrame.Minute only (multiplication not supported in all SDK versions)
+            # Simplified to just use 1Min bars
+            tf = TimeFrame.Minute
 
             request = StockBarsRequest(
                 symbol_or_symbols=symbols,
@@ -305,7 +314,8 @@ class AlpacaClient:
             if missing_symbols:
                 logger.info(f"Falling back to quotes for: {missing_symbols}")
                 quotes = self.get_latest_quote(missing_symbols)
-                result.update(quotes)
+                if quotes:
+                    result.update(quotes)
 
             return result
 
@@ -313,7 +323,8 @@ class AlpacaClient:
             logger.error(f"Error getting latest bars: {e}")
             # Try quotes as complete fallback
             logger.info("Attempting to fetch quotes as fallback")
-            return self.get_latest_quote(symbols)
+            quotes = self.get_latest_quote(symbols)
+            return quotes if quotes else {}
 
     def is_market_open(self):
         """Check if market is currently open"""
