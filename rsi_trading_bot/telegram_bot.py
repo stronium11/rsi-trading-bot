@@ -36,6 +36,7 @@ I'll notify you about:
 /positions - Current open positions
 /pnl - Profit & Loss summary
 /signals - Recent signals
+/csv - Download CSV exports (signals & trades)
 /enable - Enable trading
 /disable - Disable new trades
 /stop - Emergency stop all trading
@@ -75,6 +76,39 @@ Configuration:
         """Handle /stop command - emergency stop"""
         self.trading_enabled = False
         await update.message.reply_text("🔴 EMERGENCY STOP - All trading halted. Existing positions remain open.")
+
+    async def csv_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /csv command - send CSV export files"""
+        try:
+            from reporting import TradingReporter
+
+            await update.message.reply_text("📊 Generating CSV files...")
+
+            # Generate fresh CSVs
+            reporter = TradingReporter()
+            signals_file = reporter.export_signals_csv()
+            trades_file = reporter.export_trades_csv()
+
+            # Send signals CSV
+            with open(signals_file, 'rb') as f:
+                await update.message.reply_document(
+                    document=f,
+                    filename='signals.csv',
+                    caption='📋 Signals CSV'
+                )
+
+            # Send trades CSV
+            with open(trades_file, 'rb') as f:
+                await update.message.reply_document(
+                    document=f,
+                    filename='trades.csv',
+                    caption='💰 Trades CSV'
+                )
+
+            await update.message.reply_text("✅ CSV files sent!")
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error generating CSVs: {str(e)}")
 
     async def send_message(self, message: str, parse_mode: str = None):
         """Send message to configured chat"""
@@ -188,6 +222,7 @@ Please check the system logs.
         self.app.add_handler(CommandHandler("enable", self.enable_trading))
         self.app.add_handler(CommandHandler("disable", self.disable_trading))
         self.app.add_handler(CommandHandler("stop", self.emergency_stop))
+        self.app.add_handler(CommandHandler("csv", self.csv_command))
 
         # Start bot
         print("🤖 Telegram bot started")

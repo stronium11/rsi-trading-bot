@@ -49,6 +49,7 @@ class TradingBot:
         self.scanner_task = None
         self.executor_task = None
         self.position_task = None
+        self.telegram_task = None
 
     async def send_startup_message(self):
         """Send startup notification"""
@@ -144,6 +145,29 @@ class TradingBot:
                 await self.telegram.send_message(f"❌ {error_msg}")
                 await asyncio.sleep(60)
 
+    async def run_telegram_bot(self):
+        """Run Telegram bot to listen for commands"""
+        try:
+            # Initialize and start polling
+            await self.telegram.app.initialize()
+            await self.telegram.app.start()
+
+            print("🤖 Telegram bot listening for commands...")
+
+            # Start polling
+            await self.telegram.app.updater.start_polling(
+                poll_interval=1.0,
+                timeout=10,
+                drop_pending_updates=True
+            )
+
+            # Keep running
+            while self.running:
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            print(f"Error in Telegram bot: {str(e)}")
+
     async def get_bot_status(self) -> str:
         """Get current bot status"""
         stats = self.db.get_statistics()
@@ -213,6 +237,7 @@ class TradingBot:
             self.scanner_task = asyncio.create_task(self.run_daily_scanner())
             self.executor_task = asyncio.create_task(self.run_market_open_executor())
             self.position_task = asyncio.create_task(self.run_position_monitor())
+            self.telegram_task = asyncio.create_task(self.run_telegram_bot())
 
             print("✅ All tasks started successfully")
             print("\nBot is now running. Press Ctrl+C to stop.\n")
@@ -226,12 +251,14 @@ class TradingBot:
             self.scanner_task.cancel()
             self.executor_task.cancel()
             self.position_task.cancel()
+            self.telegram_task.cancel()
 
             # Wait for tasks to complete
             await asyncio.gather(
                 self.scanner_task,
                 self.executor_task,
                 self.position_task,
+                self.telegram_task,
                 return_exceptions=True
             )
 
