@@ -84,9 +84,9 @@ def check_database():
         print()
         print("All positions:")
         cursor.execute("""
-            SELECT id, ticker, direction, entry_price, quantity, status, created_at
+            SELECT id, ticker, direction, entry_price, quantity, status, opened_at
             FROM positions
-            ORDER BY created_at DESC
+            ORDER BY opened_at DESC
         """)
         for row in cursor.fetchall():
             print(f"  ID {row[0]}: {row[1]} - {row[2]} - {row[4]:.4f} shares @ ${row[3]:.2f} - {row[5]} - {row[6]}")
@@ -108,6 +108,43 @@ def check_database():
         """)
         for status, cnt in cursor.fetchall():
             print(f"  {status}: {cnt}")
+
+    # Ask if user wants to reset failed signals
+    print()
+    print("="*70)
+    print("RESET FAILED SIGNALS")
+    print("="*70)
+
+    cursor.execute("""
+        SELECT id, ticker, divergence_type, entry_price
+        FROM signals
+        WHERE status = 'failed'
+        ORDER BY detected_at DESC
+    """)
+
+    failed = cursor.fetchall()
+
+    if failed:
+        print(f"\nFound {len(failed)} failed signals:")
+        for sig in failed:
+            print(f"  ID {sig[0]}: {sig[1]} - {sig[2]} @ ${sig[3]:.2f}")
+
+        print()
+        response = input("Reset these signals to PENDING for testing? (yes/no): ").strip().lower()
+
+        if response == 'yes':
+            cursor.execute("""
+                UPDATE signals
+                SET status = 'pending'
+                WHERE status = 'failed'
+            """)
+            conn.commit()
+            print(f"\n✅ Reset {len(failed)} signals to PENDING")
+            print("\nYou can now run: python3 execute_signals_now.py")
+        else:
+            print("\n❌ No signals reset")
+    else:
+        print("\nNo failed signals to reset")
 
     conn.close()
 
