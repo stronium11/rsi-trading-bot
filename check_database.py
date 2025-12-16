@@ -6,11 +6,6 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent / 'rsi_trading_bot'))
-
-from config import Config
-
 def check_database():
     """Check database file and contents"""
 
@@ -19,9 +14,9 @@ def check_database():
     print("="*70)
     print()
 
-    # Get database path from config
-    db_path = Config.DATABASE_PATH
-    print(f"Database path from config: {db_path}")
+    # Database is in the rsi_trading_bot directory
+    db_path = Path(__file__).parent / 'rsi_trading_bot' / 'trading_bot.db'
+    print(f"Database path: {db_path}")
     print()
 
     # Check if file exists
