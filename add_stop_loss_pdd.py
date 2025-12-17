@@ -46,8 +46,8 @@ def main():
         stop_loss_pct = Config.STOP_LOSS_PCT / 100
         stop_price = round(entry_price * (1 - stop_loss_pct), 2)
 
-        # Round quantity to whole shares for GTC stop orders (Alpaca requirement)
-        stop_qty = round(qty)
+        # Round quantity DOWN to whole shares for GTC stop orders (Alpaca requirement)
+        stop_qty = int(qty)
 
         print(f"Placing stop loss:")
         print(f"  Position Qty: {qty:.4f} (rounded to {stop_qty} for stop order)")
