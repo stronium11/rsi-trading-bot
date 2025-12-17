@@ -5,6 +5,7 @@ Handles all data persistence using SQLite
 
 import sqlite3
 import json
+from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
@@ -26,7 +27,8 @@ class TradingDatabase:
         if self._initialized:
             return
 
-        self.db_path = 'trading_bot.db'
+        # Use absolute path to ensure all scripts access the same database
+        self.db_path = str(Path(__file__).parent / 'trading_bot.db')
         self._create_tables()
         self._initialized = True
 
