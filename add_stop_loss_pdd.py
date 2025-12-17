@@ -46,15 +46,19 @@ def main():
         stop_loss_pct = Config.STOP_LOSS_PCT / 100
         stop_price = round(entry_price * (1 - stop_loss_pct), 2)
 
+        # Round quantity to whole shares for GTC stop orders (Alpaca requirement)
+        stop_qty = round(qty)
+
         print(f"Placing stop loss:")
+        print(f"  Position Qty: {qty:.4f} (rounded to {stop_qty} for stop order)")
         print(f"  Stop Price: ${stop_price:.2f}")
-        print(f"  Type: SELL {qty:.4f} shares at stop")
+        print(f"  Type: SELL {stop_qty} shares at stop (GTC)")
         print()
 
         # Place stop loss order
         stop_order = StopOrderRequest(
             symbol='PDD',
-            qty=qty,
+            qty=stop_qty,
             side=OrderSide.SELL,
             stop_price=stop_price,
             time_in_force=TimeInForce.GTC
