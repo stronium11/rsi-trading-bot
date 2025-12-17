@@ -88,8 +88,10 @@ class TradingReporter:
 
     def export_trades_csv(self, filename: str = None) -> str:
         """
-        Export all trades to CSV in backtest format
-        Aggregates partial exits by position
+        Export all trades to CSV - includes ONGOING and COMPLETED trades
+        - Ongoing trades show current position status
+        - Completed trades show final P&L
+        - Clear visual separation between the two
 
         Returns:
         - Path to the generated CSV file
@@ -99,7 +101,35 @@ class TradingReporter:
 
         filepath = self.output_dir / filename
 
-        # Get all trades with signal and position info
+        # ==================== GET ONGOING POSITIONS ====================
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    p.id as position_id,
+                    p.ticker,
+                    p.direction,
+                    p.entry_price,
+                    p.quantity as initial_quantity,
+                    p.remaining_quantity,
+                    p.opened_at,
+                    p.t1_executed,
+                    p.t1_price,
+                    p.t1_at,
+                    p.t2_executed,
+                    p.t2_price,
+                    p.t2_at,
+                    s.timeframe,
+                    s.detected_at as signal_date,
+                    s.divergence_type
+                FROM positions p
+                LEFT JOIN signals s ON p.signal_id = s.id
+                WHERE p.status = 'open'
+                ORDER BY p.opened_at DESC
+            """)
+            ongoing_positions = [dict(row) for row in cursor.fetchall()]
+
+        # ==================== GET COMPLETED TRADES ====================
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -133,13 +163,62 @@ class TradingReporter:
             """)
             all_trades = [dict(row) for row in cursor.fetchall()]
 
+        # ==================== FORMAT ONGOING POSITIONS ====================
+        ongoing_trades = []
+        for pos in ongoing_positions:
+            # Calculate days in trade
+            entry_date = datetime.strptime(pos['opened_at'], '%Y-%m-%d %H:%M:%S')
+            days_in_trade = (datetime.now() - entry_date).days
+
+            # Calculate initial capital
+            initial_capital = pos['entry_price'] * pos['initial_quantity']
+
+            # TP status
+            tp1_status = 'Yes' if pos['t1_executed'] else 'No'
+            tp1_value = pos['t1_price'] if pos['t1_executed'] else ''
+            tp2_status = 'Yes' if pos['t2_executed'] else 'No'
+            tp2_value = pos['t2_price'] if pos['t2_executed'] else ''
+
+            # Build partial exits list
+            exits = []
+            if pos['t1_executed']:
+                exits.append(f"T1 @ ${pos['t1_price']:.2f} on {pos['t1_at'][:10]}")
+            if pos['t2_executed']:
+                exits.append(f"T2 @ ${pos['t2_price']:.2f} on {pos['t2_at'][:10]}")
+
+            ongoing_trades.append({
+                'status': 'ONGOING',
+                'ticker': pos['ticker'],
+                'timeframe': pos['timeframe'] or '1d',
+                'signal_date': pos['signal_date'] or '',
+                'entry_date': pos['opened_at'],
+                'entry_price': pos['entry_price'],
+                'divergence_type': pos['divergence_type'] or '',
+                'direction': pos['direction'],
+                'initial_shares': pos['initial_quantity'],
+                'remaining_shares': pos['remaining_quantity'],
+                'initial_capital': initial_capital,
+                'total_pnl': 'N/A - Position Open',
+                'total_pnl_pct': 'N/A',
+                'tp1_status': tp1_status,
+                'tp1_value': tp1_value,
+                'tp2_status': tp2_status,
+                'tp2_value': tp2_value,
+                'tp3_status': 'Pending',
+                'tp3_value': '',
+                'num_exits': len(exits),
+                'days_in_trade': days_in_trade,
+                'exits': ' | '.join(exits) if exits else 'None yet'
+            })
+
+        # ==================== FORMAT COMPLETED TRADES ====================
         # Group trades by position
         positions = defaultdict(list)
         for trade in all_trades:
             positions[trade['position_id']].append(trade)
 
         # Aggregate trades by position
-        aggregated_trades = []
+        completed_trades = []
         for position_id, trades in positions.items():
             if not trades:
                 continue
@@ -152,9 +231,6 @@ class TradingReporter:
             initial_capital = first_trade['position_entry_price'] * first_trade['initial_quantity']
             total_pnl_pct = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0
 
-            # Calculate average P&L per exit
-            avg_pnl_per_exit = total_pnl / len(trades) if len(trades) > 0 else 0
-
             # Determine TP1 status and value
             tp1_status = 'Yes' if first_trade['t1_executed'] else 'No'
             tp1_value = first_trade['t1_price'] if first_trade['t1_executed'] else ''
@@ -164,7 +240,6 @@ class TradingReporter:
             tp2_value = first_trade['t2_price'] if first_trade['t2_executed'] else ''
 
             # Determine TP3 status and value
-            # T3 is typically the final exit with reason containing "target3" or "50%"
             tp3_status = 'No'
             tp3_value = ''
             for trade in trades:
@@ -187,7 +262,8 @@ class TradingReporter:
                 }
                 exits.append(str(exit_dict))
 
-            aggregated_trades.append({
+            completed_trades.append({
+                'status': 'COMPLETED',
                 'ticker': first_trade['ticker'],
                 'timeframe': first_trade['timeframe'] or '1d',
                 'signal_date': first_trade['signal_date'] or '',
@@ -196,6 +272,7 @@ class TradingReporter:
                 'divergence_type': first_trade['divergence_type'] or '',
                 'direction': first_trade['direction'],
                 'initial_shares': first_trade['initial_quantity'],
+                'remaining_shares': 0,
                 'initial_capital': initial_capital,
                 'total_pnl': total_pnl,
                 'total_pnl_pct': total_pnl_pct,
@@ -205,18 +282,18 @@ class TradingReporter:
                 'tp2_value': tp2_value,
                 'tp3_status': tp3_status,
                 'tp3_value': tp3_value,
-                'avg_pnl_per_exit': avg_pnl_per_exit,
                 'num_exits': len(trades),
                 'days_in_trade': max(t['hold_days'] for t in trades),
                 'exits': ' | '.join(exits)
             })
 
-        # Write to CSV
+        # ==================== WRITE TO CSV ====================
         with open(filepath, 'w', newline='') as f:
             writer = csv.writer(f)
 
             # Header
             writer.writerow([
+                'status',
                 'ticker',
                 'timeframe',
                 'signal_date',
@@ -225,6 +302,7 @@ class TradingReporter:
                 'divergence_type',
                 'direction',
                 'initial_shares',
+                'remaining_shares',
                 'initial_capital',
                 'total_pnl',
                 'total_pnl_pct',
@@ -234,15 +312,15 @@ class TradingReporter:
                 'tp2_value',
                 'tp3_status',
                 'tp3_value',
-                'avg_pnl_per_exit',
                 'num_exits',
                 'days_in_trade',
                 'exits'
             ])
 
-            # Data rows
-            for trade in aggregated_trades:
+            # ==================== ONGOING TRADES (TOP) ====================
+            for trade in ongoing_trades:
                 writer.writerow([
+                    trade['status'],
                     trade['ticker'],
                     trade['timeframe'],
                     trade['signal_date'],
@@ -251,6 +329,43 @@ class TradingReporter:
                     trade['divergence_type'],
                     trade['direction'],
                     f"{trade['initial_shares']:.4f}",
+                    f"{trade['remaining_shares']:.4f}",
+                    f"{trade['initial_capital']:.2f}",
+                    trade['total_pnl'],
+                    trade['total_pnl_pct'],
+                    trade['tp1_status'],
+                    f"{trade['tp1_value']:.2f}" if trade['tp1_value'] else '',
+                    trade['tp2_status'],
+                    f"{trade['tp2_value']:.2f}" if trade['tp2_value'] else '',
+                    trade['tp3_status'],
+                    trade['tp3_value'],
+                    trade['num_exits'],
+                    trade['days_in_trade'],
+                    trade['exits']
+                ])
+
+            # ==================== VISUAL SEPARATOR ====================
+            if ongoing_trades and completed_trades:
+                # Add blank row for separation
+                writer.writerow([])
+                # Add separator row
+                writer.writerow(['--- COMPLETED TRADES BELOW ---', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''])
+                # Add blank row
+                writer.writerow([])
+
+            # ==================== COMPLETED TRADES (BOTTOM) ====================
+            for trade in completed_trades:
+                writer.writerow([
+                    trade['status'],
+                    trade['ticker'],
+                    trade['timeframe'],
+                    trade['signal_date'],
+                    trade['entry_date'],
+                    f"{trade['entry_price']:.2f}",
+                    trade['divergence_type'],
+                    trade['direction'],
+                    f"{trade['initial_shares']:.4f}",
+                    f"{trade['remaining_shares']:.4f}",
                     f"{trade['initial_capital']:.2f}",
                     f"{trade['total_pnl']:.2f}",
                     f"{trade['total_pnl_pct']:.2f}",
@@ -260,14 +375,15 @@ class TradingReporter:
                     f"{trade['tp2_value']:.2f}" if trade['tp2_value'] else '',
                     trade['tp3_status'],
                     f"{trade['tp3_value']:.2f}" if trade['tp3_value'] else '',
-                    f"{trade['avg_pnl_per_exit']:.2f}",
                     trade['num_exits'],
                     trade['days_in_trade'],
                     trade['exits']
                 ])
 
         print(f"✅ Trades exported to: {filepath}")
-        print(f"   Total positions: {len(aggregated_trades)}")
+        print(f"   Ongoing positions: {len(ongoing_trades)}")
+        print(f"   Completed trades: {len(completed_trades)}")
+        print(f"   Total: {len(ongoing_trades) + len(completed_trades)}")
         return str(filepath)
 
     def generate_analytics(self, filename: str = None) -> str:
