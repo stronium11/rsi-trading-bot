@@ -350,6 +350,8 @@ class OrderExecutor:
 
             # Execute each signal
             for signal in pending_signals:
+                ticker = signal['ticker']
+
                 # Check if we can still trade
                 limits = self.check_risk_limits()
                 if not limits['can_trade']:
@@ -360,6 +362,23 @@ class OrderExecutor:
                         notes='Risk limits reached'
                     )
                     stats['skipped'] += 1
+                    continue
+
+                # DUPLICATE PREVENTION: Check if we already have a position for this ticker
+                existing_positions = self.db.get_open_positions()
+                existing_tickers = {pos['ticker'] for pos in existing_positions}
+
+                if ticker in existing_tickers:
+                    print(f"\n⚠️  Skipping {ticker} - already have open position")
+                    self.db.update_signal_status(
+                        signal['id'],
+                        'skipped',
+                        notes='Duplicate - already have open position for this ticker'
+                    )
+                    stats['skipped'] += 1
+                    await self.telegram.send_message(
+                        f"⚠️ Skipped {ticker} - duplicate position detected"
+                    )
                     continue
 
                 # Execute signal
