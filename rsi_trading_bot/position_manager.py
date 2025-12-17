@@ -373,7 +373,7 @@ class PositionManager:
         try:
             # Check if market is open
             market_hours = self.alpaca.get_market_hours()
-            if not market_hours['is_open']:
+            if not market_hours or not market_hours['is_open']:
                 return
 
             # Get all open positions
