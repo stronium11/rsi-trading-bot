@@ -44,7 +44,7 @@ def main():
 
         # Calculate stop loss (7% below entry for LONG)
         stop_loss_pct = Config.STOP_LOSS_PCT / 100
-        stop_price = entry_price * (1 - stop_loss_pct)
+        stop_price = round(entry_price * (1 - stop_loss_pct), 2)
 
         print(f"Placing stop loss:")
         print(f"  Stop Price: ${stop_price:.2f}")
