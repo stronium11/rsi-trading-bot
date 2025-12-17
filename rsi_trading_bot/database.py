@@ -197,6 +197,62 @@ class TradingDatabase:
                     UPDATE signals SET status = ? WHERE id = ?
                 """, (status, signal_id))
 
+    def check_for_duplicate_signal(self, ticker: str, divergence_type: str,
+                                   timeframe: str, entry_price: float) -> Dict:
+        """
+        Check if an identical signal already exists in the last 2 weeks
+
+        Compares: ticker, divergence_type, timeframe, and close price
+
+        Args:
+            ticker: Stock ticker symbol
+            divergence_type: 'Bullish' or 'Bearish'
+            timeframe: '1d', '3d', '1w'
+            entry_price: Signal close price
+
+        Returns:
+            Dict with 'is_duplicate' (bool) and 'original' (dict) if duplicate found
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get datetime 2 weeks ago
+            from datetime import datetime, timedelta
+            two_weeks_ago = (datetime.now() - timedelta(weeks=2)).strftime('%Y-%m-%d %H:%M:%S')
+
+            # Look for matching signal in last 2 weeks
+            cursor.execute("""
+                SELECT id, ticker, divergence_type, timeframe, entry_price,
+                       detected_at, status
+                FROM signals
+                WHERE ticker = ?
+                AND divergence_type = ?
+                AND timeframe = ?
+                AND ABS(entry_price - ?) < 0.01
+                AND detected_at >= ?
+                ORDER BY detected_at DESC
+                LIMIT 1
+            """, (ticker, divergence_type, timeframe, entry_price, two_weeks_ago))
+
+            result = cursor.fetchone()
+
+            if result:
+                # Found a duplicate
+                return {
+                    'is_duplicate': True,
+                    'original': {
+                        'id': result[0],
+                        'ticker': result[1],
+                        'divergence_type': result[2],
+                        'timeframe': result[3],
+                        'entry_price': result[4],
+                        'detected_at': result[5],
+                        'status': result[6]
+                    }
+                }
+            else:
+                return {'is_duplicate': False}
+
     def get_executed_signals_today(self, ticker: str) -> bool:
         """
         Check if we already executed a signal for this ticker today

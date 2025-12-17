@@ -223,34 +223,60 @@ class LiveScanner:
 
         saved_count = 0
         skipped_count = 0
+        duplicate_details = []
+
         for signal in signals:
             try:
                 ticker = signal['ticker']
+                divergence_type = signal['divergence_type']
+                timeframe = signal['timeframe']
+                entry_price = signal['entry_price']
 
-                # Check for duplicates BEFORE adding
-                if self.db.has_active_signal_or_position(ticker):
-                    print(f"⚠️  Skipping {ticker} - already has pending signal or open position")
+                # SOPHISTICATED DUPLICATE CHECK
+                # Compares: ticker, timeframe, direction, AND close price within 2 weeks
+                duplicate_check = self.db.check_for_duplicate_signal(
+                    ticker=ticker,
+                    divergence_type=divergence_type,
+                    timeframe=timeframe,
+                    entry_price=entry_price
+                )
+
+                if duplicate_check['is_duplicate']:
+                    original = duplicate_check['original']
+                    print(f"⚠️  Skipping {ticker} - duplicate signal")
+                    print(f"   Current: {divergence_type} {timeframe} @ ${entry_price:.2f}")
+                    print(f"   Original: Signal #{original['id']} from {original['detected_at']}")
                     skipped_count += 1
+
+                    # Store details for summary notification
+                    duplicate_details.append({
+                        'ticker': ticker,
+                        'divergence_type': divergence_type,
+                        'timeframe': timeframe,
+                        'entry_price': entry_price,
+                        'original_id': original['id'],
+                        'original_date': original['detected_at']
+                    })
                     continue
 
                 # Add signal to database
                 signal_id = self.db.add_signal(
-                    ticker=signal['ticker'],
-                    divergence_type=signal['divergence_type'],
-                    timeframe=signal['timeframe'],
-                    entry_price=signal['entry_price'],
+                    ticker=ticker,
+                    divergence_type=divergence_type,
+                    timeframe=timeframe,
+                    entry_price=entry_price,
                     rsi_value=signal['rsi_value'],
                     notes=f"Detected on {signal['signal_date']}"
                 )
 
                 saved_count += 1
 
-                # Send Telegram notification
+                # Send Telegram notification for NEW signals
                 await self.telegram.send_signal_alert(
-                    ticker=signal['ticker'],
-                    divergence_type=signal['divergence_type'],
-                    timeframe=signal['timeframe'],
-                    entry_price=signal['entry_price']
+                    ticker=ticker,
+                    divergence_type=divergence_type,
+                    timeframe=timeframe,
+                    entry_price=entry_price
                 )
 
             except Exception as e:
@@ -266,9 +292,12 @@ class LiveScanner:
 
 Total Signals: {len(signals)}
 Saved to Database: {saved_count}
-
-Breakdown:
 """
+        if skipped_count > 0:
+            summary += f"Duplicates Skipped: {skipped_count}\n"
+
+        summary += "\nBreakdown:\n"
+
         # Count by type
         bullish_count = sum(1 for s in signals if s['divergence_type'] == 'Bullish')
         bearish_count = sum(1 for s in signals if s['divergence_type'] == 'Bearish')
@@ -281,6 +310,14 @@ Breakdown:
         for tf in self.timeframes:
             count = sum(1 for s in signals if s['timeframe'] == tf)
             summary += f"• {tf}: {count}\n"
+
+        # Add duplicate details if any
+        if duplicate_details:
+            summary += f"\n⚠️ *Duplicate Signals Detected:*\n"
+            for dup in duplicate_details:
+                summary += (f"• {dup['ticker']} ({dup['divergence_type']} {dup['timeframe']}) "
+                           f"@ ${dup['entry_price']:.2f}\n"
+                           f"  _Duplicate of signal #{dup['original_id']} from {dup['original_date']}_\n")
 
         await self.telegram.send_message(summary, parse_mode='Markdown')
 
