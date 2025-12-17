@@ -27,6 +27,10 @@ logs/
 bot.log
 nohup.out
 
+# Reports (generated CSV files)
+reports/
+*.csv
+
 # IDE
 .vscode/
 .idea/
