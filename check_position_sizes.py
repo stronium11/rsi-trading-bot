@@ -43,26 +43,34 @@ def check_positions():
         unrealized_pl = float(pos.unrealized_pl)
         side = pos.side  # 'long' or 'short'
 
+        # Calculate ENTRY VALUE (what we paid when opening)
+        entry_value = entry_price * abs(qty)
+
         # Calculate expected quantity for this position
         expected_qty = expected_size / entry_price
 
-        # Check if oversized (more than 1.5x expected)
-        is_oversized = market_value > (expected_size * 1.5)
+        # Check if ENTRY was oversized (not if it grew profitable)
+        is_oversized = entry_value > (expected_size * 1.5)
 
-        size_ratio = market_value / expected_size
+        entry_ratio = entry_value / expected_size
+        current_ratio = market_value / expected_size
 
-        status = "⚠️ OVERSIZED" if is_oversized else "✅ OK"
+        status = "⚠️ OPENED OVERSIZED" if is_oversized else "✅ OK"
 
         print(f"{symbol} ({side.upper()}):")
         print(f"  Current Qty: {qty:.4f} shares")
         print(f"  Expected Qty: {expected_qty:.4f} shares")
         print(f"  Entry Price: ${entry_price:.2f}")
         print(f"  Current Price: ${current_price:.2f}")
-        print(f"  Market Value: ${market_value:,.2f}")
+        print(f"  Entry Value: ${entry_value:,.2f} (opened at {entry_ratio:.2f}x)")
+        print(f"  Market Value: ${market_value:,.2f} (currently {current_ratio:.2f}x)")
         print(f"  Expected Size: ${expected_size:,.2f}")
-        print(f"  Size Ratio: {size_ratio:.2f}x")
         print(f"  P&L: ${unrealized_pl:,.2f}")
         print(f"  Status: {status}")
+        if is_oversized:
+            print(f"  → Likely duplicate orders - should reduce position")
+        elif current_ratio > 1.5:
+            print(f"  → Position grew profitable - this is GOOD, don't reduce")
         print()
 
         if is_oversized:
@@ -73,8 +81,9 @@ def check_positions():
                 'expected_qty': expected_qty,
                 'excess_qty': qty - expected_qty,
                 'entry_price': entry_price,
+                'entry_value': entry_value,
                 'market_value': market_value,
-                'size_ratio': size_ratio
+                'entry_ratio': entry_ratio
             })
 
     if oversized:
@@ -85,9 +94,11 @@ def check_positions():
 
         for pos in oversized:
             print(f"{pos['symbol']}:")
-            print(f"  Size ratio: {pos['size_ratio']:.2f}x expected")
+            print(f"  Opened at: {pos['entry_ratio']:.2f}x expected size")
+            print(f"  Entry value: ${pos['entry_value']:,.2f} (should be $5,000)")
             print(f"  Excess shares: {pos['excess_qty']:.4f}")
             print(f"  Excess value: ${pos['excess_qty'] * pos['entry_price']:,.2f}")
+            print(f"  → Likely duplicate orders during opening")
             print()
     else:
         print("="*70)

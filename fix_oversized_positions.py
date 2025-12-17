@@ -47,13 +47,19 @@ def fix_oversized_positions():
         market_value = abs(float(pos.market_value))
         side = pos.side  # 'long' or 'short'
 
-        # Check if oversized (more than 1.5x target)
-        if market_value > (target_size * 1.5):
-            # Calculate target quantity
-            target_qty = target_size / current_price
+        # Calculate ENTRY VALUE (what we paid when opening position)
+        # This catches positions opened oversized, not positions that grew profitable
+        entry_value = entry_price * abs(qty)
+        unrealized_pl = float(pos.unrealized_pl)
+
+        # Check if ENTRY was oversized (more than 1.5x target)
+        # This way we only fix duplicate order issues, not profitable positions
+        if entry_value > (target_size * 1.5):
+            # Calculate target quantity based on ENTRY price
+            target_qty = target_size / entry_price
             excess_qty = abs(qty) - target_qty
 
-            size_ratio = market_value / target_size
+            entry_ratio = entry_value / target_size
 
             oversized.append({
                 'symbol': symbol,
@@ -61,15 +67,21 @@ def fix_oversized_positions():
                 'current_qty': abs(qty),
                 'target_qty': target_qty,
                 'excess_qty': excess_qty,
+                'entry_price': entry_price,
                 'current_price': current_price,
+                'entry_value': entry_value,
                 'market_value': market_value,
-                'size_ratio': size_ratio
+                'entry_ratio': entry_ratio,
+                'unrealized_pl': unrealized_pl
             })
 
-            print(f"⚠️  {symbol} ({side.upper()}) - {size_ratio:.2f}x oversized")
-            print(f"   Current: {abs(qty):.4f} shares (${market_value:,.2f})")
-            print(f"   Target: {target_qty:.4f} shares (${target_size:,.2f})")
-            print(f"   Excess: {excess_qty:.4f} shares (${excess_qty * current_price:,.2f})")
+            print(f"⚠️  {symbol} ({side.upper()}) - OPENED {entry_ratio:.2f}x oversized")
+            print(f"   Entry Value: ${entry_value:,.2f} (should be ${target_size:,.2f})")
+            print(f"   Current Qty: {abs(qty):.4f} shares @ ${current_price:.2f}")
+            print(f"   Target Qty: {target_qty:.4f} shares")
+            print(f"   Excess: {excess_qty:.4f} shares")
+            print(f"   Current P&L: ${unrealized_pl:,.2f}")
+            print(f"   → This position was opened oversized (likely duplicate orders)")
             print()
 
     if not oversized:

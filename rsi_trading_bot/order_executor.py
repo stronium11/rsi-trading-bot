@@ -364,20 +364,21 @@ class OrderExecutor:
                     stats['skipped'] += 1
                     continue
 
-                # DUPLICATE PREVENTION: Check if we already have a position for this ticker
-                existing_positions = self.db.get_open_positions()
-                existing_tickers = {pos['ticker'] for pos in existing_positions}
+                # DUPLICATE PREVENTION: Check if we already executed this ticker TODAY
+                # This allows new signals on same ticker from different timeframes or future dates
+                # but prevents duplicate execution of the same signal within 24 hours
+                executed_today = self.db.get_executed_signals_today(ticker)
 
-                if ticker in existing_tickers:
-                    print(f"\n⚠️  Skipping {ticker} - already have open position")
+                if executed_today:
+                    print(f"\n⚠️  Skipping {ticker} - already executed today")
                     self.db.update_signal_status(
                         signal['id'],
                         'skipped',
-                        notes='Duplicate - already have open position for this ticker'
+                        notes=f'Duplicate - already executed {ticker} today'
                     )
                     stats['skipped'] += 1
                     await self.telegram.send_message(
-                        f"⚠️ Skipped {ticker} - duplicate position detected"
+                        f"⚠️ Skipped {ticker} - already executed today (prevents duplicate orders)"
                     )
                     continue
 

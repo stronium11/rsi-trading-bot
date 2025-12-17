@@ -197,6 +197,34 @@ class TradingDatabase:
                     UPDATE signals SET status = ? WHERE id = ?
                 """, (status, signal_id))
 
+    def get_executed_signals_today(self, ticker: str) -> bool:
+        """
+        Check if we already executed a signal for this ticker today
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            True if ticker was executed today, False otherwise
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get today's date
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
+
+            # Check for executed signals today
+            cursor.execute("""
+                SELECT COUNT(*) FROM signals
+                WHERE ticker = ?
+                AND status = 'executed'
+                AND DATE(detected_at) = ?
+            """, (ticker, today))
+
+            count = cursor.fetchone()[0]
+            return count > 0
+
     def has_active_signal_or_position(self, ticker: str) -> bool:
         """
         Check if ticker already has a pending signal or open position
