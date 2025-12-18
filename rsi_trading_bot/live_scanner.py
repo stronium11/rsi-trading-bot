@@ -134,8 +134,9 @@ class LiveScanner:
             # Detect divergences
             df_with_divergence = detect_divergence(df, rsi_values)
 
-            # Only look at last 5 candles for NEW signals
-            recent_df = df_with_divergence.tail(5)
+            # Only look at the MOST RECENT candle for truly NEW signals
+            # This prevents re-detecting the same divergence for 5 consecutive days
+            recent_df = df_with_divergence.tail(1)
 
             signals = []
 
