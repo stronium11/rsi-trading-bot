@@ -134,9 +134,17 @@ class LiveScanner:
             # Detect divergences
             df_with_divergence = detect_divergence(df, rsi_values)
 
-            # Only look at the MOST RECENT candle for truly NEW signals
-            # This prevents re-detecting the same divergence for 5 consecutive days
-            recent_df = df_with_divergence.tail(1)
+            # For 3d and 1w timeframes, skip the last candle if incomplete
+            # The last candle is incomplete until the period ends, causing price changes daily
+            if timeframe in ['3d', '1w']:
+                # Use second-to-last candle (most recent COMPLETE candle)
+                if len(df_with_divergence) >= 2:
+                    recent_df = df_with_divergence.tail(2).head(1)
+                else:
+                    recent_df = df_with_divergence.tail(1)
+            else:
+                # For daily timeframe, use most recent candle
+                recent_df = df_with_divergence.tail(1)
 
             signals = []
 
