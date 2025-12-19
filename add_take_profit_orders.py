@@ -26,36 +26,36 @@ def main():
     print("="*70 + "\n")
 
     # Initialize clients
-    db = get_database()
+    from alpaca_client import get_alpaca_client
+
+    alpaca = get_alpaca_client()
     trading_client = TradingClient(
         api_key=Config.ALPACA_API_KEY,
         secret_key=Config.ALPACA_SECRET_KEY,
         paper=True  # Paper trading
     )
 
-    # Get all open positions from database
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT
-                p.id,
-                p.ticker,
-                p.direction,
-                p.entry_price,
-                p.quantity,
-                p.opened_at
-            FROM positions p
-            WHERE p.status = 'open'
-            ORDER BY p.ticker
-        """)
+    # Get all open positions from Alpaca
+    positions_data = alpaca.get_positions()
 
-        positions = cursor.fetchall()
-
-    if not positions:
-        print("No open positions found.")
+    if not positions_data:
+        print("No open positions found in Alpaca.")
         return
 
-    print(f"Found {len(positions)} open positions\n")
+    print(f"Found {len(positions_data)} open positions in Alpaca\n")
+
+    # Convert Alpaca positions to our format
+    positions = []
+    for p in positions_data:
+        ticker = p['symbol']
+        qty = float(p['qty'])
+        entry_price = float(p['avg_entry_price'])
+        side = p['side']  # 'long' or 'short'
+
+        # Determine direction
+        direction = 'LONG' if side == 'long' else 'SHORT'
+
+        positions.append((None, ticker, direction, entry_price, qty, None))
 
     # Profit target configuration
     t1_pct = Config.TARGET1_PCT / 100  # 0.15 (+15%)
