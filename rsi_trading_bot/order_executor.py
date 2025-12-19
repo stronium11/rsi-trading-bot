@@ -93,8 +93,9 @@ class OrderExecutor:
         1. Place bracket order (entry + stop loss together)
         2. Place T1 take profit order (70% of position @ +15%)
         3. Place T2 take profit order (15% of position @ +18%)
-        4. If all Alpaca orders succeed: save to database
-        5. If any order fails: cancel all orders, mark signal failed
+        4. Place T3 take profit order (15% of position @ +50%)
+        5. If all Alpaca orders succeed: save to database
+        6. If any order fails: cancel all orders, mark signal failed
 
         Parameters:
         - signal: Signal dictionary from database
@@ -141,15 +142,17 @@ class OrderExecutor:
                 # LONG: profit when price goes up
                 t1_price = round(filled_price * 1.15, 2)  # +15%
                 t2_price = round(filled_price * 1.18, 2)  # +18%
+                t3_price = round(filled_price * 1.50, 2)  # +50%
             else:
                 # SHORT: profit when price goes down
                 t1_price = round(filled_price * 0.85, 2)  # -15%
                 t2_price = round(filled_price * 0.82, 2)  # -18%
+                t3_price = round(filled_price * 0.50, 2)  # -50%
 
             # Calculate quantities for take profit orders
             t1_qty = quantity * 0.70  # 70% of position
             t2_qty = quantity * 0.15  # 15% of position
-            # Remaining 15% runs for T3 (+50%) - no order needed
+            t3_qty = quantity * 0.15  # 15% of position for T3 target
 
             # STEP 3: Place T1 take profit order
             t1_order = self.alpaca.place_take_profit_order(
@@ -179,7 +182,21 @@ class OrderExecutor:
             alpaca_orders.append(t2_order['order_id'])
             print(f"✅ T2 take profit: ${t2_price:.2f} (15% of position)")
 
-            # STEP 5: All Alpaca orders succeeded - now save to database atomically
+            # STEP 5: Place T3 take profit order
+            t3_order = self.alpaca.place_take_profit_order(
+                symbol=ticker,
+                direction=direction,
+                target_price=t3_price,
+                qty=t3_qty
+            )
+
+            if not t3_order:
+                raise Exception(f"Failed to place T3 take profit for {ticker}")
+
+            alpaca_orders.append(t3_order['order_id'])
+            print(f"✅ T3 take profit: ${t3_price:.2f} (15% of position)")
+
+            # STEP 6: All Alpaca orders succeeded - now save to database atomically
 
             # Save main market order
             self.db.add_order(
@@ -222,6 +239,17 @@ class OrderExecutor:
                 price=t2_price
             )
 
+            # Save T3 take profit order
+            self.db.add_order(
+                signal_id=signal_id,
+                alpaca_order_id=t3_order['order_id'],
+                ticker=ticker,
+                order_type='limit',
+                side='sell' if direction == 'LONG' else 'buy',
+                quantity=t3_qty,
+                price=t3_price
+            )
+
             # Create position record
             position_id = self.db.add_position(
                 signal_id=signal_id,
@@ -235,7 +263,7 @@ class OrderExecutor:
             # Update signal status
             self.db.update_signal_status(signal_id, 'executed')
 
-            # STEP 6: Send notifications
+            # STEP 7: Send notifications
             await self.telegram.send_order_alert(
                 ticker=ticker,
                 direction=direction,
@@ -250,20 +278,20 @@ class OrderExecutor:
                     f"🛡️ Stop: ${stop_price:.2f} (-{self.initial_stop_pct}%)\n"
                     f"🎯 T1: ${t1_price:.2f} (+15%, 70%)\n"
                     f"🎯 T2: ${t2_price:.2f} (+18%, 15%)\n"
-                    f"🚀 T3: Running (15% for +50%)"
+                    f"🎯 T3: ${t3_price:.2f} (+50%, 15%)"
                 )
             else:
                 profit_msg = (
                     f"🛡️ Stop: ${stop_price:.2f} (+{self.initial_stop_pct}%)\n"
                     f"🎯 T1: ${t1_price:.2f} (-15%, 70%)\n"
                     f"🎯 T2: ${t2_price:.2f} (-18%, 15%)\n"
-                    f"🚀 T3: Running (15% for -50%)"
+                    f"🎯 T3: ${t3_price:.2f} (-50%, 15%)"
                 )
 
             await self.telegram.send_message(profit_msg)
 
             print(f"✅ Position fully configured with stop loss and take profit orders")
-            print(f"   Remaining 15% will run for T3 target (+50%)")
+            print(f"   All take profit orders placed: T1 (+15%), T2 (+18%), T3 (+50%)")
 
             return True
 
