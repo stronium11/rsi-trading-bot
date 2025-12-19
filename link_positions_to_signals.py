@@ -58,7 +58,8 @@ def link_positions_to_signals():
         # Parse opened_at to datetime
         opened_date = datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')
 
-        # Search for matching signals within +/- 7 days and +/- $5 price
+        # Search for matching signals within +/- 7 days and +/- $50 price
+        # Wide tolerance because signal detection price != actual fill price
         search_start = (opened_date - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
         search_end = (opened_date + timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -69,7 +70,7 @@ def link_positions_to_signals():
                 FROM signals
                 WHERE ticker = ?
                 AND divergence_type = ?
-                AND ABS(entry_price - ?) <= 5.0
+                AND ABS(entry_price - ?) <= 50.0
                 AND detected_at >= ?
                 AND detected_at <= ?
                 ORDER BY ABS(entry_price - ?) ASC, ABS(julianday(detected_at) - julianday(?)) ASC
