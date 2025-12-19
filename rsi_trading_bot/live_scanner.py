@@ -225,7 +225,27 @@ class LiveScanner:
         """
         if len(signals) == 0:
             print("No new signals to save.")
-            await self.telegram.send_message("✅ Daily scan complete. No new signals detected.")
+
+            # Count total signals in database from Dec 11 onwards
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*)
+                    FROM signals
+                    WHERE DATE(detected_at) >= '2025-12-11'
+                """)
+                total_signals = cursor.fetchone()[0]
+
+            summary = f"""
+📊 *Daily Scan Summary*
+
+Total Database Signals (until today): {total_signals}
+Total New Signals Detected Today: 0
+Duplicate Signals Detected Today: 0
+
+Total Database Signals (including today): {total_signals}
+"""
+            await self.telegram.send_message(summary, parse_mode='Markdown')
             return
 
         print(f"\nSaving {len(signals)} signals to database...")
@@ -295,15 +315,29 @@ class LiveScanner:
         if skipped_count > 0:
             print(f"⚠️  Skipped {skipped_count} duplicate signals")
 
+        # Count total unique signals in database from Dec 11 onwards (before today)
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM signals
+                WHERE DATE(detected_at) >= '2025-12-11'
+                AND DATE(detected_at) < DATE('now')
+            """)
+            total_before_today = cursor.fetchone()[0]
+
+        # Total signals after today's scan
+        total_after_today = total_before_today + saved_count
+
         # Send summary notification
         summary = f"""
 📊 *Daily Scan Summary*
 
-Total Signals: {len(signals)}
-Saved to Database: {saved_count}
+Total Database Signals (until today): {total_before_today}
+Total New Signals Detected Today: {saved_count}
 """
         if skipped_count > 0:
-            summary += f"Duplicates Skipped: {skipped_count}\n"
+            summary += f"Duplicate Signals Detected Today: {skipped_count}\n"
 
         summary += "\nBreakdown:\n"
 
@@ -327,6 +361,9 @@ Saved to Database: {saved_count}
                 summary += (f"• {dup['ticker']} ({dup['divergence_type']} {dup['timeframe']}) "
                            f"@ ${dup['entry_price']:.2f}\n"
                            f"  _Duplicate of signal #{dup['original_id']} from {dup['original_date']}_\n")
+
+        # Add total after today's scan
+        summary += f"\nTotal Database Signals (including today): {total_after_today}\n"
 
         await self.telegram.send_message(summary, parse_mode='Markdown')
 
