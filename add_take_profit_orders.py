@@ -98,15 +98,21 @@ def main():
                 t3_price = round(entry_price * (1 - t3_pct), 2)  # -50%
                 order_side = OrderSide.BUY  # Buy to close short
 
-            # Calculate quantities for each target
-            t1_qty = quantity * t1_size  # 70%
-            t2_qty = quantity * t2_size  # 15%
-            t3_qty = quantity * t3_size  # 15%
+            # Calculate quantities for each target (use absolute value for SHORT positions)
+            abs_qty = abs(quantity)
+            t1_qty = abs_qty * t1_size  # 70%
+            t2_qty = abs_qty * t2_size  # 15%
+            t3_qty = abs_qty * t3_size  # 15%
+
+            # Round to whole shares (GTC orders require whole shares)
+            t1_qty = int(t1_qty)
+            t2_qty = int(t2_qty)
+            t3_qty = int(t3_qty)
 
             print(f"\nTarget Prices:")
-            print(f"  T1: ${t1_price:.2f} ({t1_pct*100:.0f}%) - {t1_size*100:.0f}% position ({t1_qty:.4f} shares)")
-            print(f"  T2: ${t2_price:.2f} ({t2_pct*100:.0f}%) - {t2_size*100:.0f}% position ({t2_qty:.4f} shares)")
-            print(f"  T3: ${t3_price:.2f} ({t3_pct*100:.0f}%) - {t3_size*100:.0f}% position ({t3_qty:.4f} shares)")
+            print(f"  T1: ${t1_price:.2f} ({t1_pct*100:.0f}%) - {t1_size*100:.0f}% position ({t1_qty} shares)")
+            print(f"  T2: ${t2_price:.2f} ({t2_pct*100:.0f}%) - {t2_size*100:.0f}% position ({t2_qty} shares)")
+            print(f"  T3: ${t3_price:.2f} ({t3_pct*100:.0f}%) - {t3_size*100:.0f}% position ({t3_qty} shares)")
 
             # Place T1 take profit order
             print(f"\nPlacing T1 limit order...")
