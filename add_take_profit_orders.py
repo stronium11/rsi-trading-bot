@@ -26,36 +26,39 @@ def main():
     print("="*70 + "\n")
 
     # Initialize clients
-    from alpaca_client import get_alpaca_client
-
-    alpaca = get_alpaca_client()
+    db = get_database()
     trading_client = TradingClient(
         api_key=Config.ALPACA_API_KEY,
         secret_key=Config.ALPACA_SECRET_KEY,
         paper=True  # Paper trading
     )
 
-    # Get all open positions from Alpaca
-    positions_data = alpaca.get_positions()
+    # Get all open positions from database (the single source of truth)
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                p.id,
+                p.ticker,
+                p.direction,
+                p.entry_price,
+                p.quantity,
+                p.opened_at
+            FROM positions p
+            WHERE p.status = 'open'
+            ORDER BY p.ticker
+        """)
 
-    if not positions_data:
-        print("No open positions found in Alpaca.")
+        positions = cursor.fetchall()
+
+    if not positions:
+        print("No open positions found in database.")
+        print("\n⚠️  If you have positions in Alpaca, run this first:")
+        print("    python3 sync_existing_positions.py")
+        print("\nThen run this script again.")
         return
 
-    print(f"Found {len(positions_data)} open positions in Alpaca\n")
-
-    # Convert Alpaca positions to our format
-    positions = []
-    for p in positions_data:
-        ticker = p['symbol']
-        qty = float(p['qty'])
-        entry_price = float(p['avg_entry_price'])
-        side = p['side']  # 'long' or 'short'
-
-        # Determine direction
-        direction = 'LONG' if side == 'long' else 'SHORT'
-
-        positions.append((None, ticker, direction, entry_price, qty, None))
+    print(f"Found {len(positions)} open positions\n")
 
     # Profit target configuration
     t1_pct = Config.TARGET1_PCT / 100  # 0.15 (+15%)
