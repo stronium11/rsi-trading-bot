@@ -2,11 +2,6 @@
 """
 Script to place missing take profit orders for existing positions
 Places T1 (+15%, 70%), T2 (+18%, 15%), T3 (+50%, 15%)
-
-STRATEGY:
-1. Cancel existing stop loss order for each position
-2. Place T1, T2, T3 take profit orders
-3. Place new stop loss for remaining shares (15% after T1+T2 exit)
 """
 
 import sys
@@ -17,7 +12,7 @@ sys.path.insert(0, str(Path.cwd() / 'rsi_trading_bot'))
 
 from database import get_database
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import LimitOrderRequest, StopOrderRequest
+from alpaca.trading.requests import LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from config import Config
 import os
@@ -119,21 +114,7 @@ def main():
             print(f"  T2: ${t2_price:.2f} ({t2_pct*100:.0f}%) - {t2_size*100:.0f}% position ({t2_qty} shares)")
             print(f"  T3: ${t3_price:.2f} ({t3_pct*100:.0f}%) - {t3_size*100:.0f}% position ({t3_qty} shares)")
 
-            # STEP 1: Cancel existing stop loss orders for this ticker
-            print(f"\n🔍 Checking for existing stop loss orders...")
-            existing_orders = trading_client.get_orders(status='open', symbols=[ticker])
-            stop_orders_cancelled = 0
-            for order in existing_orders:
-                if order.type == 'stop':
-                    print(f"  Cancelling stop order {order.id}...")
-                    trading_client.cancel_order_by_id(order.id)
-                    stop_orders_cancelled += 1
-            if stop_orders_cancelled > 0:
-                print(f"✅ Cancelled {stop_orders_cancelled} existing stop loss order(s)")
-            else:
-                print(f"  No existing stop orders found")
-
-            # STEP 2: Place T1 take profit order
+            # Place T1 take profit order
             print(f"\nPlacing T1 limit order...")
             t1_order = LimitOrderRequest(
                 symbol=ticker,
@@ -169,34 +150,8 @@ def main():
             t3_response = trading_client.submit_order(t3_order)
             print(f"✅ T3 order placed: {t3_response.id}")
 
-            # STEP 3: Place new stop loss for remaining shares (15% that will exit at T3)
-            print(f"\nPlacing new stop loss for remaining shares...")
-
-            # Calculate stop loss price (7% from entry)
-            stop_loss_pct = Config.STOP_LOSS_PCT / 100
-            if direction == 'LONG':
-                stop_price = round(entry_price * (1 - stop_loss_pct), 2)
-                stop_side = OrderSide.SELL
-            else:  # SHORT
-                stop_price = round(entry_price * (1 + stop_loss_pct), 2)
-                stop_side = OrderSide.BUY
-
-            # Stop loss is for the remaining 15% (t3_qty)
-            stop_order = StopOrderRequest(
-                symbol=ticker,
-                qty=t3_qty,
-                side=stop_side,
-                stop_price=stop_price,
-                time_in_force=TimeInForce.GTC
-            )
-            stop_response = trading_client.submit_order(stop_order)
-            print(f"✅ New stop loss placed: ${stop_price:.2f} ({t3_qty} shares)")
-            print(f"   Order ID: {stop_response.id}")
-
             success_count += 1
-            print(f"\n✅ All orders placed successfully for {ticker}")
-            print(f"   - 3 take profit orders (T1, T2, T3)")
-            print(f"   - 1 stop loss order (for remaining 15%)")
+            print(f"\n✅ All take profit orders placed successfully for {ticker}")
 
         except Exception as e:
             print(f"\n❌ Error placing orders for {ticker}: {str(e)}")
