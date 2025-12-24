@@ -114,30 +114,45 @@ class OrderExecutor:
 
             print(f"\nExecuting {direction} order for {ticker}...")
 
-            # STEP 1: Place bracket order (entry + stop loss together)
-            # This prevents wash trade errors on SHORT positions
-            bracket_order = self.alpaca.place_bracket_order_with_stop(
+            # STEP 1: Place market order for entry
+            entry_order = self.alpaca.place_market_order(
                 symbol=ticker,
                 direction=direction,
-                position_size=self.position_size,
-                stop_loss_pct=self.initial_stop_pct
+                position_size=self.position_size
             )
 
-            if not bracket_order:
-                raise Exception(f"Failed to place bracket order for {ticker}")
+            if not entry_order:
+                raise Exception(f"Failed to place entry order for {ticker}")
 
-            alpaca_orders.append(bracket_order['order_id'])
+            alpaca_orders.append(entry_order['order_id'])
 
             # Extract order details
-            order_id = bracket_order['order_id']
-            filled_price = bracket_order['price']
-            quantity = bracket_order['qty']
-            stop_price = bracket_order['stop_price']
+            order_id = entry_order['order_id']
+            filled_price = entry_order['price']
+            quantity = entry_order['qty']
 
-            print(f"✅ Bracket order placed: {quantity:.4f} shares @ ${filled_price:.2f}")
-            print(f"   Stop loss: ${stop_price:.2f}")
+            print(f"✅ Entry order placed: {quantity:.4f} shares @ ${filled_price:.2f}")
 
-            # STEP 2: Calculate take profit targets
+            # STEP 2: Place stop loss order
+            if direction == 'LONG':
+                stop_price = round(filled_price * (1 - self.initial_stop_pct/100), 2)
+            else:
+                stop_price = round(filled_price * (1 + self.initial_stop_pct/100), 2)
+
+            stop_order = self.alpaca.place_stop_loss_order(
+                symbol=ticker,
+                direction=direction,
+                stop_price=stop_price,
+                qty=quantity
+            )
+
+            if not stop_order:
+                raise Exception(f"Failed to place stop loss order for {ticker}")
+
+            alpaca_orders.append(stop_order['order_id'])
+            print(f"✅ Stop loss: ${stop_price:.2f}")
+
+            # STEP 3: Calculate take profit targets
             if direction == 'LONG':
                 # LONG: profit when price goes up
                 t1_price = round(filled_price * 1.15, 2)  # +15%
@@ -154,7 +169,7 @@ class OrderExecutor:
             t2_qty = quantity * 0.15  # 15% of position
             t3_qty = quantity * 0.15  # 15% of position for T3 target
 
-            # STEP 3: Place T1 take profit order
+            # STEP 4: Place T1 take profit order
             t1_order = self.alpaca.place_take_profit_order(
                 symbol=ticker,
                 direction=direction,
@@ -168,7 +183,7 @@ class OrderExecutor:
             alpaca_orders.append(t1_order['order_id'])
             print(f"✅ T1 take profit: ${t1_price:.2f} (70% of position)")
 
-            # STEP 4: Place T2 take profit order
+            # STEP 5: Place T2 take profit order
             t2_order = self.alpaca.place_take_profit_order(
                 symbol=ticker,
                 direction=direction,
@@ -182,7 +197,7 @@ class OrderExecutor:
             alpaca_orders.append(t2_order['order_id'])
             print(f"✅ T2 take profit: ${t2_price:.2f} (15% of position)")
 
-            # STEP 5: Place T3 take profit order
+            # STEP 6: Place T3 take profit order
             t3_order = self.alpaca.place_take_profit_order(
                 symbol=ticker,
                 direction=direction,
@@ -196,7 +211,7 @@ class OrderExecutor:
             alpaca_orders.append(t3_order['order_id'])
             print(f"✅ T3 take profit: ${t3_price:.2f} (15% of position)")
 
-            # STEP 6: All Alpaca orders succeeded - now save to database atomically
+            # STEP 7: All Alpaca orders succeeded - now save to database atomically
 
             # Save main market order
             self.db.add_order(
@@ -215,6 +230,17 @@ class OrderExecutor:
                 status='filled',
                 filled_price=filled_price,
                 filled_at=None
+            )
+
+            # Save stop loss order
+            self.db.add_order(
+                signal_id=signal_id,
+                alpaca_order_id=stop_order['order_id'],
+                ticker=ticker,
+                order_type='stop',
+                side='sell' if direction == 'LONG' else 'buy',
+                quantity=quantity,
+                price=stop_price
             )
 
             # Save T1 take profit order
