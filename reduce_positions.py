@@ -105,7 +105,16 @@ def main():
         try:
             # STEP 1: Cancel existing stop loss orders
             print(f"\n🔍 Checking for existing stop loss orders...")
-            existing_orders = trading_client.get_orders(status='open', symbols=[ticker])
+            from alpaca.trading.requests import GetOrdersRequest
+            from alpaca.trading.enums import QueryOrderStatus
+
+            # Get open orders for this symbol
+            order_filter = GetOrdersRequest(
+                status=QueryOrderStatus.OPEN,
+                symbols=[ticker]
+            )
+            existing_orders = trading_client.get_orders(filter=order_filter)
+
             stop_orders_cancelled = 0
             for order in existing_orders:
                 if order.type == 'stop':
