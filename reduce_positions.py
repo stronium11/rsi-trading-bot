@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Reduce oversized positions by specified dollar amounts
+
+STRATEGY:
+1. Cancel existing stop loss orders
+2. Place market order to reduce position
+3. Place new stop loss for remaining shares
 """
 
 import sys
@@ -9,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path.cwd() / 'rsi_trading_bot'))
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, StopOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from config import Config
 
@@ -77,19 +82,45 @@ def main():
         print(f"  Shares to reduce: {shares_to_reduce:.4f}")
         print(f"  Dollar value: ${shares_to_reduce * current_price:,.2f}")
 
+        # Calculate remaining shares after reduction
+        remaining_shares = current_qty - shares_to_reduce
+        print(f"  Remaining shares after: {remaining_shares:.4f}")
+
         # Determine order side based on position direction
         if direction == 'long':
             # For LONG positions, SELL to reduce
             order_side = OrderSide.SELL
+            stop_side = OrderSide.SELL
+            # Stop loss 7% below entry
+            entry_price = float(position.avg_entry_price)
+            stop_price = round(entry_price * 0.93, 2)  # 7% below entry
         else:
             # For SHORT positions, BUY to reduce (cover)
             order_side = OrderSide.BUY
-
-        # Confirm before placing order
-        print(f"\n➡️  Placing {order_side.value.upper()} market order for {shares_to_reduce:.4f} shares...")
+            stop_side = OrderSide.BUY
+            # Stop loss 7% above entry
+            entry_price = float(position.avg_entry_price)
+            stop_price = round(entry_price * 1.07, 2)  # 7% above entry
 
         try:
-            # Place market order to reduce position
+            # STEP 1: Cancel existing stop loss orders
+            print(f"\n🔍 Checking for existing stop loss orders...")
+            existing_orders = trading_client.get_orders(status='open', symbols=[ticker])
+            stop_orders_cancelled = 0
+            for order in existing_orders:
+                if order.type == 'stop':
+                    print(f"  Cancelling stop order {order.id}...")
+                    trading_client.cancel_order_by_id(order.id)
+                    stop_orders_cancelled += 1
+
+            if stop_orders_cancelled > 0:
+                print(f"✅ Cancelled {stop_orders_cancelled} existing stop loss order(s)")
+            else:
+                print(f"  No existing stop orders found")
+
+            # STEP 2: Place market order to reduce position
+            print(f"\n➡️  Placing {order_side.value.upper()} market order for {shares_to_reduce:.4f} shares...")
+
             order = MarketOrderRequest(
                 symbol=ticker,
                 qty=shares_to_reduce,
@@ -99,14 +130,36 @@ def main():
 
             response = trading_client.submit_order(order)
 
-            print(f"✅ Order placed successfully!")
+            print(f"✅ Reduction order placed successfully!")
             print(f"   Order ID: {response.id}")
             print(f"   Status: {response.status}")
+
+            # STEP 3: Place new stop loss for remaining shares
+            print(f"\n➡️  Placing new stop loss for remaining {remaining_shares:.4f} shares...")
+            print(f"   Stop price: ${stop_price:.2f} (7% from entry ${entry_price:.2f})")
+
+            # Round remaining shares to whole number for GTC orders
+            stop_qty = int(remaining_shares)
+
+            stop_order = StopOrderRequest(
+                symbol=ticker,
+                qty=stop_qty,
+                side=stop_side,
+                stop_price=stop_price,
+                time_in_force=TimeInForce.GTC
+            )
+
+            stop_response = trading_client.submit_order(stop_order)
+
+            print(f"✅ New stop loss placed successfully!")
+            print(f"   Order ID: {stop_response.id}")
+            print(f"   Stop price: ${stop_price:.2f}")
+            print(f"   Quantity: {stop_qty} shares")
 
             success_count += 1
 
         except Exception as e:
-            print(f"❌ Error placing order: {e}")
+            print(f"❌ Error: {e}")
             error_count += 1
 
     # Summary
