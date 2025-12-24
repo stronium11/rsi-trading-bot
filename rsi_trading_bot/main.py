@@ -15,6 +15,7 @@ from telegram_bot import get_bot
 from live_scanner import get_scanner
 from order_executor import get_order_executor
 from position_manager import get_position_manager
+from market_holidays import get_market_holidays
 
 
 class TradingBot:
@@ -35,6 +36,7 @@ class TradingBot:
         self.scanner = get_scanner()
         self.executor = get_order_executor()
         self.position_manager = get_position_manager()
+        self.holidays = get_market_holidays()
 
         # Eastern Time (market timezone)
         self.et_tz = pytz.timezone('US/Eastern')
@@ -99,17 +101,36 @@ class TradingBot:
                 # Get current time in ET
                 now_et = datetime.now(self.et_tz)
                 current_time = now_et.time()
+                today = now_et.date()
 
                 # Check if it's time to run the scanner
                 if current_time.hour == self.scanner_time.hour and current_time.minute == self.scanner_time.minute:
-                    print(f"\n{'='*70}")
-                    print(f"DAILY SCAN TRIGGERED - {now_et.strftime('%Y-%m-%d %H:%M:%S ET')}")
-                    print(f"{'='*70}\n")
+                    # Check if today is a trading day
+                    if not self.holidays.is_trading_day(today):
+                        if self.holidays.is_weekend(today):
+                            reason = "weekend"
+                        else:
+                            reason = "market holiday"
 
-                    await self.scanner.run_daily_scan()
+                        print(f"\n{'='*70}")
+                        print(f"SKIPPING SCAN - {now_et.strftime('%Y-%m-%d')} is a {reason}")
+                        print(f"{'='*70}\n")
 
-                    # Sleep for 65 seconds to avoid running twice in the same minute
-                    await asyncio.sleep(65)
+                        await self.telegram.send_message(
+                            f"⏭️ Skipping daily scan - {now_et.strftime('%A, %B %d, %Y')} is a {reason}"
+                        )
+
+                        # Sleep for 65 seconds to avoid checking again this minute
+                        await asyncio.sleep(65)
+                    else:
+                        print(f"\n{'='*70}")
+                        print(f"DAILY SCAN TRIGGERED - {now_et.strftime('%Y-%m-%d %H:%M:%S ET')}")
+                        print(f"{'='*70}\n")
+
+                        await self.scanner.run_daily_scan()
+
+                        # Sleep for 65 seconds to avoid running twice in the same minute
+                        await asyncio.sleep(65)
                 else:
                     # Check every 30 seconds
                     await asyncio.sleep(30)
@@ -127,17 +148,36 @@ class TradingBot:
                 # Get current time in ET
                 now_et = datetime.now(self.et_tz)
                 current_time = now_et.time()
+                today = now_et.date()
 
                 # Check if it's market open time
                 if current_time.hour == self.market_open.hour and current_time.minute == self.market_open.minute:
-                    print(f"\n{'='*70}")
-                    print(f"MARKET OPEN EXECUTION - {now_et.strftime('%Y-%m-%d %H:%M:%S ET')}")
-                    print(f"{'='*70}\n")
+                    # Check if today is a trading day
+                    if not self.holidays.is_trading_day(today):
+                        if self.holidays.is_weekend(today):
+                            reason = "weekend"
+                        else:
+                            reason = "market holiday"
 
-                    await self.executor.run_market_open_execution()
+                        print(f"\n{'='*70}")
+                        print(f"SKIPPING EXECUTION - {now_et.strftime('%Y-%m-%d')} is a {reason}")
+                        print(f"{'='*70}\n")
 
-                    # Sleep for 65 seconds to avoid running twice
-                    await asyncio.sleep(65)
+                        await self.telegram.send_message(
+                            f"⏭️ Skipping order execution - {now_et.strftime('%A, %B %d, %Y')} is a {reason}"
+                        )
+
+                        # Sleep for 65 seconds to avoid checking again this minute
+                        await asyncio.sleep(65)
+                    else:
+                        print(f"\n{'='*70}")
+                        print(f"MARKET OPEN EXECUTION - {now_et.strftime('%Y-%m-%d %H:%M:%S ET')}")
+                        print(f"{'='*70}\n")
+
+                        await self.executor.run_market_open_execution()
+
+                        # Sleep for 65 seconds to avoid running twice
+                        await asyncio.sleep(65)
                 else:
                     # Check every 30 seconds
                     await asyncio.sleep(30)
