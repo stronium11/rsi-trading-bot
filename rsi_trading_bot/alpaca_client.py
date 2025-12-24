@@ -192,10 +192,10 @@ class AlpacaClient:
             # Calculate shares
             shares = position_size / current_price
 
-            # Round to whole shares for SHORT orders (Alpaca requirement)
-            if direction == 'SHORT':
-                shares = int(shares)
-                logger.info(f"Rounded SHORT order to {shares} whole shares")
+            # Round to whole shares for bracket orders (Alpaca requirement for both LONG and SHORT)
+            # Fractional shares with bracket orders cause errors
+            shares = int(shares)
+            logger.info(f"Rounded to {shares} whole shares for bracket order")
 
             # Calculate stop price (rounded to 2 decimals)
             if direction == 'LONG':
@@ -208,9 +208,8 @@ class AlpacaClient:
             # Determine side
             side = OrderSide.BUY if direction == 'LONG' else OrderSide.SELL
 
-            # Fractional shares require DAY, whole shares can use GTC
-            is_fractional = shares != int(shares)
-            time_in_force = TimeInForce.DAY if is_fractional else TimeInForce.GTC
+            # Use GTC for all bracket orders (whole shares only)
+            time_in_force = TimeInForce.GTC
 
             # Create bracket order with BOTH stop loss and take profit
             bracket_order = MarketOrderRequest(
