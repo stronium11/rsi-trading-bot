@@ -141,10 +141,35 @@ def main():
                     print(f"✅ Cancelled {stop_orders_cancelled} existing stop loss order(s)")
                 if stop_orders_pending > 0:
                     print(f"⏳ {stop_orders_pending} stop loss order(s) already pending cancellation")
-                # Wait for Alpaca to process the cancellation
+
+                # Wait and poll until orders are actually cancelled
                 import time
-                print(f"  Waiting 5 seconds for cancellation to complete...")
-                time.sleep(5)
+                print(f"  Polling order status until cancelled (max 30 seconds)...")
+                max_wait = 30
+                poll_interval = 2
+                elapsed = 0
+                stop_orders_remaining = stop_orders_cancelled + stop_orders_pending
+
+                while elapsed < max_wait:
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+
+                    # Check if stop orders are gone
+                    check_filter = GetOrdersRequest(
+                        status=QueryOrderStatus.OPEN,
+                        symbols=[ticker]
+                    )
+                    current_orders = trading_client.get_orders(filter=check_filter)
+                    stop_orders_remaining = sum(1 for o in current_orders if o.type == 'stop')
+
+                    if stop_orders_remaining == 0:
+                        print(f"  ✅ All stop orders cancelled after {elapsed} seconds")
+                        break
+                    else:
+                        print(f"  ⏳ {stop_orders_remaining} stop order(s) still pending... ({elapsed}s elapsed)")
+
+                if stop_orders_remaining > 0:
+                    raise Exception(f"Stop orders still not cancelled after {max_wait} seconds")
             else:
                 print(f"  No existing stop orders found")
 
