@@ -114,16 +114,17 @@ class OrderExecutor:
 
             print(f"\nExecuting {direction} order for {ticker}...")
 
-            # STEP 1: Place bracket order (entry + stop loss + T3 take profit)
-            # Using T3 (+50%) in the bracket because it's the furthest target
+            # STEP 1: Place bracket order (entry + stop loss + T1 take profit)
+            # Using T1 (+15%) as the primary/only take profit
             # This avoids "potential wash trade" errors on SHORT positions
+            # Note: We're using T1 which takes 70% of position at +15% profit
             bracket_order = self.alpaca.place_bracket_order_with_targets(
                 symbol=ticker,
                 direction=direction,
                 position_size=self.position_size,
                 stop_loss_pct=self.initial_stop_pct,  # 7%
-                take_profit_pct=50,  # T3 target at +50%
-                take_profit_qty_pct=100  # Full position (we'll handle partials below)
+                take_profit_pct=15,  # T1 target at +15% (most important level)
+                take_profit_qty_pct=100  # Full position
             )
 
             if not bracket_order:
@@ -138,58 +139,12 @@ class OrderExecutor:
             stop_price = bracket_order['stop_price']
             t3_price_from_bracket = bracket_order['take_profit_price']
 
+            t1_price_from_bracket = bracket_order['take_profit_price']
+
             print(f"✅ Bracket order placed: {quantity:.4f} shares @ ${filled_price:.2f}")
             print(f"   Stop loss: ${stop_price:.2f}")
-            print(f"   Bracket includes T3 at ${t3_price_from_bracket:.2f}")
-
-            # STEP 2: Calculate take profit targets for T1 and T2
-            if direction == 'LONG':
-                # LONG: profit when price goes up
-                t1_price = round(filled_price * 1.15, 2)  # +15%
-                t2_price = round(filled_price * 1.18, 2)  # +18%
-                t3_price = round(filled_price * 1.50, 2)  # +50%
-            else:
-                # SHORT: profit when price goes down
-                t1_price = round(filled_price * 0.85, 2)  # -15%
-                t2_price = round(filled_price * 0.82, 2)  # -18%
-                t3_price = round(filled_price * 0.50, 2)  # -50%
-
-            # Calculate quantities for take profit orders
-            t1_qty = quantity * 0.70  # 70% of position
-            t2_qty = quantity * 0.15  # 15% of position
-            # Note: T3 (15%) is already in the bracket order for full quantity
-            # We won't place a separate T3 order
-
-            # STEP 3: Place T1 take profit order
-            t1_order = self.alpaca.place_take_profit_order(
-                symbol=ticker,
-                direction=direction,
-                target_price=t1_price,
-                qty=t1_qty
-            )
-
-            if not t1_order:
-                raise Exception(f"Failed to place T1 take profit for {ticker}")
-
-            alpaca_orders.append(t1_order['order_id'])
-            print(f"✅ T1 take profit: ${t1_price:.2f} (70% of position)")
-
-            # STEP 4: Place T2 take profit order
-            t2_order = self.alpaca.place_take_profit_order(
-                symbol=ticker,
-                direction=direction,
-                target_price=t2_price,
-                qty=t2_qty
-            )
-
-            if not t2_order:
-                raise Exception(f"Failed to place T2 take profit for {ticker}")
-
-            alpaca_orders.append(t2_order['order_id'])
-            print(f"✅ T2 take profit: ${t2_price:.2f} (15% of position)")
-
-            # T3 is already in the bracket order, no need to place separately
-            print(f"   (T3 @ ${t3_price:.2f} already in bracket)")
+            print(f"   Take profit (T1): ${t1_price_from_bracket:.2f} (+15%)")
+            print(f"   ✅ Position secured with stop loss and take profit")
 
             # STEP 5: All Alpaca orders succeeded - now save to database atomically
 
@@ -212,30 +167,8 @@ class OrderExecutor:
                 filled_at=None
             )
 
-            # Note: Stop loss and T3 take profit are part of the bracket order
-            # They're managed by Alpaca and will appear in order.legs
-
-            # Save T1 take profit order
-            self.db.add_order(
-                signal_id=signal_id,
-                alpaca_order_id=t1_order['order_id'],
-                ticker=ticker,
-                order_type='limit',
-                side='sell' if direction == 'LONG' else 'buy',
-                quantity=t1_qty,
-                price=t1_price
-            )
-
-            # Save T2 take profit order
-            self.db.add_order(
-                signal_id=signal_id,
-                alpaca_order_id=t2_order['order_id'],
-                ticker=ticker,
-                order_type='limit',
-                side='sell' if direction == 'LONG' else 'buy',
-                quantity=t2_qty,
-                price=t2_price
-            )
+            # Note: Stop loss and take profit (T1) are part of the bracket order
+            # They're managed by Alpaca automatically
 
             # Create position record
             position_id = self.db.add_position(
@@ -262,23 +195,18 @@ class OrderExecutor:
             # Format profit percentages based on direction
             if direction == 'LONG':
                 profit_msg = (
-                    f"🛡️ Stop: ${stop_price:.2f} (-{self.initial_stop_pct}%)\n"
-                    f"🎯 T1: ${t1_price:.2f} (+15%, 70%)\n"
-                    f"🎯 T2: ${t2_price:.2f} (+18%, 15%)\n"
-                    f"🎯 T3: ${t3_price:.2f} (+50%, 15%)"
+                    f"🛡️ Stop Loss: ${stop_price:.2f} (-{self.initial_stop_pct}%)\n"
+                    f"🎯 Take Profit: ${t1_price_from_bracket:.2f} (+15%)"
                 )
             else:
                 profit_msg = (
-                    f"🛡️ Stop: ${stop_price:.2f} (+{self.initial_stop_pct}%)\n"
-                    f"🎯 T1: ${t1_price:.2f} (-15%, 70%)\n"
-                    f"🎯 T2: ${t2_price:.2f} (-18%, 15%)\n"
-                    f"🎯 T3: ${t3_price:.2f} (-50%, 15%)"
+                    f"🛡️ Stop Loss: ${stop_price:.2f} (+{self.initial_stop_pct}%)\n"
+                    f"🎯 Take Profit: ${t1_price_from_bracket:.2f} (-15%)"
                 )
 
             await self.telegram.send_message(profit_msg)
 
-            print(f"✅ Position fully configured with stop loss and take profit orders")
-            print(f"   All take profit orders placed: T1 (+15%), T2 (+18%), T3 (+50%)")
+            print(f"✅ Position secured with stop loss and take profit")
 
             return True
 
