@@ -116,18 +116,35 @@ def main():
             existing_orders = trading_client.get_orders(filter=order_filter)
 
             stop_orders_cancelled = 0
+            stop_orders_pending = 0
             for order in existing_orders:
                 if order.type == 'stop':
-                    print(f"  Cancelling stop order {order.id}...")
-                    trading_client.cancel_order_by_id(order.id)
-                    stop_orders_cancelled += 1
+                    # Check if order is already pending cancellation
+                    if order.status == 'pending_cancel':
+                        print(f"  Stop order {order.id} already pending cancellation...")
+                        stop_orders_pending += 1
+                    else:
+                        print(f"  Cancelling stop order {order.id}...")
+                        try:
+                            trading_client.cancel_order_by_id(order.id)
+                            stop_orders_cancelled += 1
+                        except Exception as cancel_error:
+                            # Order might already be pending cancel
+                            if "pending cancel" in str(cancel_error):
+                                print(f"  Order already pending cancellation")
+                                stop_orders_pending += 1
+                            else:
+                                raise
 
-            if stop_orders_cancelled > 0:
-                print(f"✅ Cancelled {stop_orders_cancelled} existing stop loss order(s)")
+            if stop_orders_cancelled > 0 or stop_orders_pending > 0:
+                if stop_orders_cancelled > 0:
+                    print(f"✅ Cancelled {stop_orders_cancelled} existing stop loss order(s)")
+                if stop_orders_pending > 0:
+                    print(f"⏳ {stop_orders_pending} stop loss order(s) already pending cancellation")
                 # Wait for Alpaca to process the cancellation
                 import time
-                print(f"  Waiting 3 seconds for cancellation to process...")
-                time.sleep(3)
+                print(f"  Waiting 5 seconds for cancellation to complete...")
+                time.sleep(5)
             else:
                 print(f"  No existing stop orders found")
 
