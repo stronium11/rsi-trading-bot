@@ -361,59 +361,11 @@ class OrderExecutor:
             )
 
             # Execute each signal
+            # NOTE: No duplicate checking here - these signals already passed
+            # duplicate prevention when they were detected by the scanner.
+            # Pending signals should execute without re-checking for duplicates.
             for signal in pending_signals:
                 ticker = signal['ticker']
-
-                # DUPLICATE PREVENTION: Check for identical signal in last 2 weeks
-                # Compares: ticker, timeframe, direction, AND close price
-                # This allows:
-                #   - Different timeframes: 1D vs 3D on same ticker ✓
-                #   - Different prices: Same ticker/timeframe but different price levels ✓
-                #   - Time-separated: Same signal but >2 weeks apart ✓
-                # This blocks:
-                #   - Exact duplicates: Same ticker, timeframe, direction, price within 2 weeks ✗
-                divergence_type = signal['divergence_type']
-                timeframe = signal['timeframe']
-                entry_price = signal['entry_price']
-
-                duplicate_check = self.db.check_for_duplicate_signal(
-                    ticker=ticker,
-                    divergence_type=divergence_type,
-                    timeframe=timeframe,
-                    entry_price=entry_price
-                )
-
-                if duplicate_check['is_duplicate']:
-                    original = duplicate_check['original']
-                    print(f"\n⚠️  Skipping {ticker} - duplicate signal detected")
-                    print(f"   Current: {divergence_type} {timeframe} @ ${entry_price:.2f}")
-                    print(f"   Original: Detected {original['detected_at']} (ID: {original['id']}, Status: {original['status']})")
-
-                    notes = (f"Duplicate of signal #{original['id']} from {original['detected_at']} - "
-                            f"Same {divergence_type} {timeframe} @ ${original['entry_price']:.2f}")
-
-                    self.db.update_signal_status(
-                        signal['id'],
-                        'skipped',
-                        notes=notes
-                    )
-                    stats['skipped'] += 1
-
-                    # Send detailed notification
-                    await self.telegram.send_message(
-                        f"⚠️ *Duplicate Signal Detected*\n\n"
-                        f"*Current Signal:*\n"
-                        f"• {ticker} - {divergence_type} {timeframe}\n"
-                        f"• Entry: ${entry_price:.2f}\n\n"
-                        f"*Original Signal:*\n"
-                        f"• Detected: {original['detected_at']}\n"
-                        f"• ID: #{original['id']}\n"
-                        f"• Status: {original['status']}\n"
-                        f"• Entry: ${original['entry_price']:.2f}\n\n"
-                        f"_Signal skipped - identical to recent signal_",
-                        parse_mode='Markdown'
-                    )
-                    continue
 
                 # Execute signal
                 success = await self.execute_signal(signal)
