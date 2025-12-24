@@ -153,9 +153,10 @@ class AlpacaClient:
             logger.error(f"Error placing market order for {symbol}: {e}")
             return None
 
-    def place_bracket_order_with_stop(self, symbol, direction, position_size, stop_loss_pct):
+    def place_bracket_order_with_targets(self, symbol, direction, position_size, stop_loss_pct,
+                                         take_profit_pct, take_profit_qty_pct):
         """
-        Place bracket order with entry + stop loss
+        Place bracket order with entry + stop loss + take profit
         This avoids wash trade errors by submitting them together
 
         Args:
@@ -163,6 +164,8 @@ class AlpacaClient:
             direction: 'LONG' or 'SHORT'
             position_size: Dollar amount to invest
             stop_loss_pct: Stop loss percentage (e.g., 7 for 7%)
+            take_profit_pct: Take profit percentage (e.g., 15 for 15%)
+            take_profit_qty_pct: Percentage of position for take profit (e.g., 70 for 70%)
 
         Returns:
             Dict with order details or None
@@ -197,8 +200,10 @@ class AlpacaClient:
             # Calculate stop price (rounded to 2 decimals)
             if direction == 'LONG':
                 stop_price = round(current_price * (1 - stop_loss_pct/100), 2)
+                take_profit_price = round(current_price * (1 + take_profit_pct/100), 2)
             else:
                 stop_price = round(current_price * (1 + stop_loss_pct/100), 2)
+                take_profit_price = round(current_price * (1 - take_profit_pct/100), 2)
 
             # Determine side
             side = OrderSide.BUY if direction == 'LONG' else OrderSide.SELL
@@ -207,19 +212,21 @@ class AlpacaClient:
             is_fractional = shares != int(shares)
             time_in_force = TimeInForce.DAY if is_fractional else TimeInForce.GTC
 
-            # Create bracket order with stop loss
+            # Create bracket order with BOTH stop loss and take profit
             bracket_order = MarketOrderRequest(
                 symbol=symbol,
                 qty=shares,
                 side=side,
                 time_in_force=time_in_force,
                 order_class=OrderClass.BRACKET,
-                stop_loss={'stop_price': stop_price}
+                stop_loss={'stop_price': stop_price},
+                take_profit={'limit_price': take_profit_price}
             )
 
             order = self.trading_client.submit_order(bracket_order)
 
-            logger.info(f"Bracket order placed: {symbol} {direction} {shares:.4f} shares @ ${current_price:.2f}, stop @ ${stop_price:.2f}")
+            logger.info(f"Bracket order placed: {symbol} {direction} {shares:.4f} shares @ ${current_price:.2f}")
+            logger.info(f"  Stop: ${stop_price:.2f}, Take Profit: ${take_profit_price:.2f}")
 
             return {
                 'order_id': str(order.id),
@@ -228,6 +235,7 @@ class AlpacaClient:
                 'side': direction,
                 'price': current_price,
                 'stop_price': stop_price,
+                'take_profit_price': take_profit_price,
                 'status': order.status,
                 'legs': order.legs if hasattr(order, 'legs') else []
             }
