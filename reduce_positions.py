@@ -124,6 +124,10 @@ def main():
 
             if stop_orders_cancelled > 0:
                 print(f"✅ Cancelled {stop_orders_cancelled} existing stop loss order(s)")
+                # Wait for Alpaca to process the cancellation
+                import time
+                print(f"  Waiting 3 seconds for cancellation to process...")
+                time.sleep(3)
             else:
                 print(f"  No existing stop orders found")
 
