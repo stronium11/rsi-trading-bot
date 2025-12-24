@@ -345,22 +345,6 @@ class OrderExecutor:
                 await self.telegram.send_message(msg)
                 return stats
 
-            # Check risk limits
-            limits = self.check_risk_limits()
-            if not limits['can_trade']:
-                reasons = []
-                if not limits['max_positions_ok']:
-                    reasons.append(f"Max positions ({self.max_positions}) reached")
-                if not limits['daily_trades_ok']:
-                    reasons.append(f"Daily trade limit ({self.max_daily_trades}) reached")
-                if not limits['daily_loss_ok']:
-                    reasons.append(f"Daily loss limit (${self.daily_loss_limit}) hit")
-
-                msg = f"⚠️ Risk limits exceeded:\n" + "\n".join(f"• {r}" for r in reasons)
-                print(msg)
-                await self.telegram.send_message(msg)
-                return stats
-
             # Get pending signals
             pending_signals = self.db.get_pending_signals()
             stats['total_pending'] = len(pending_signals)
@@ -379,18 +363,6 @@ class OrderExecutor:
             # Execute each signal
             for signal in pending_signals:
                 ticker = signal['ticker']
-
-                # Check if we can still trade
-                limits = self.check_risk_limits()
-                if not limits['can_trade']:
-                    print(f"\nRisk limits reached. Skipping remaining signals.")
-                    self.db.update_signal_status(
-                        signal['id'],
-                        'skipped',
-                        notes='Risk limits reached'
-                    )
-                    stats['skipped'] += 1
-                    continue
 
                 # DUPLICATE PREVENTION: Check for identical signal in last 2 weeks
                 # Compares: ticker, timeframe, direction, AND close price
