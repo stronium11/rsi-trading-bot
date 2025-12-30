@@ -204,7 +204,11 @@ class TradingDatabase:
         """
         Check if an identical signal already exists in the last 2 weeks
 
-        Compares: ticker, divergence_type, timeframe, and close price
+        TWO-STAGE CHECK:
+        1. Same ticker/timeframe/direction detected TODAY (any price) → duplicate
+           This prevents re-detecting same divergence pattern multiple times per day
+        2. Same ticker/timeframe/direction with similar price in last 2 weeks → duplicate
+           This prevents trading the same setup too frequently
 
         Args:
             ticker: Stock ticker symbol
@@ -218,11 +222,44 @@ class TradingDatabase:
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Get datetime 2 weeks ago
             from datetime import datetime, timedelta
+
+            # STAGE 1: Check for same ticker/timeframe/direction detected TODAY
+            # This catches multiple scans detecting the same divergence on the same day
+            today_start = datetime.now().strftime('%Y-%m-%d 00:00:00')
+
+            cursor.execute("""
+                SELECT id, ticker, divergence_type, timeframe, entry_price,
+                       detected_at, status
+                FROM signals
+                WHERE ticker = ?
+                AND divergence_type = ?
+                AND timeframe = ?
+                AND detected_at >= ?
+                ORDER BY detected_at DESC
+                LIMIT 1
+            """, (ticker, divergence_type, timeframe, today_start))
+
+            today_result = cursor.fetchone()
+
+            if today_result:
+                # Found signal from today - duplicate regardless of price
+                return {
+                    'is_duplicate': True,
+                    'original': {
+                        'id': today_result[0],
+                        'ticker': today_result[1],
+                        'divergence_type': today_result[2],
+                        'timeframe': today_result[3],
+                        'entry_price': today_result[4],
+                        'detected_at': today_result[5],
+                        'status': today_result[6]
+                    }
+                }
+
+            # STAGE 2: Check last 2 weeks for similar price (if not from today)
             two_weeks_ago = (datetime.now() - timedelta(weeks=2)).strftime('%Y-%m-%d %H:%M:%S')
 
-            # Look for matching signal in last 2 weeks
             cursor.execute("""
                 SELECT id, ticker, divergence_type, timeframe, entry_price,
                        detected_at, status
@@ -239,7 +276,7 @@ class TradingDatabase:
             result = cursor.fetchone()
 
             if result:
-                # Found a duplicate
+                # Found a duplicate in last 2 weeks with similar price
                 return {
                     'is_duplicate': True,
                     'original': {
