@@ -248,31 +248,7 @@ Total Database Signals (including today): {total_signals}
             await self.telegram.send_message(summary, parse_mode='Markdown')
             return
 
-        # DEDUPLICATE IN-MEMORY SIGNALS BEFORE PROCESSING
-        # Remove exact duplicates from the signals list before checking database
-        original_count = len(signals)
-        seen = set()
-        unique_signals = []
-
-        for signal in signals:
-            # Create a unique key from signal attributes
-            key = (
-                signal['ticker'],
-                signal['divergence_type'],
-                signal['timeframe'],
-                round(signal['entry_price'], 2)  # Round to avoid floating point issues
-            )
-
-            if key not in seen:
-                seen.add(key)
-                unique_signals.append(signal)
-
-        deduplicated_count = original_count - len(unique_signals)
-        if deduplicated_count > 0:
-            print(f"⚠️  Removed {deduplicated_count} in-memory duplicate(s) before database check")
-
-        signals = unique_signals
-        print(f"\nSaving {len(signals)} unique signals to database...")
+        print(f"\nSaving {len(signals)} signals to database...")
 
         saved_count = 0
         skipped_count = 0
